@@ -1,0 +1,1427 @@
+// =============================================================================
+// Gestor de Oficinas — Prisma schema (Fase 1)
+// -----------------------------------------------------------------------------
+// Convenções:
+//  - Multi-tenant: toda tabela de negócio tem `tenant_id` (UUID, indexado).
+//    O isolamento efetivo é via Row Level Security no PostgreSQL (ver rls.sql).
+//  - IDs UUID gerados no cliente/servidor — compatível com sync offline (PowerSync).
+//  - Soft delete via `deletedAt` (evita hard delete, necessário para sync).
+//  - Dinheiro: Decimal(14,2); Quantidades: Decimal(14,3); Alíquotas: Decimal(6,3).
+//  - Tabelas em snake_case via @@map; colunas de escopo com @map("tenant_id").
+//  - `createdAt`/`updatedAt` presentes para sincronização incremental.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
+enum RoleScope {
+  SYSTEM
+  TENANT
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  COMPANY
+}
+
+enum OdometerUnit {
+  KM
+  MILE
+}
+
+enum TransmissionType {
+  MANUAL
+  AUTOMATIC
+  CVT
+}
+
+enum JobType {
+  INSPECTION
+  REPAIR
+  SERVICE
+}
+
+// Máquina de estado unificada do JobCard (validada no servidor).
+enum JobStatus {
+  DRAFT
+  SCHEDULED
+  CHECKED_IN
+  IN_INSPECTION
+  WAITING_APPROVAL
+  APPROVED
+  IN_PROGRESS
+  WAITING_PARTS
+  COMPLETED
+  DELIVERED
+  CANCELLED
+  LOCKED
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  CHECKED_IN
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum InspectionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum InspectionResult {
+  OK
+  ATTENTION
+  REPAIR
+  NOT_INSPECTED
+  NOT_APPLICABLE
+}
+
+enum ApprovalStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum QuestionType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  DATE
+  DATETIME
+  BOOLEAN
+  SELECT
+  MULTISELECT
+  CHECKBOX
+  COLOR
+  ATTACHMENT
+  LINK
+}
+
+enum SectionDisplayType {
+  SECTION
+  NOTE
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum LineItemType {
+  LABOR
+  PART
+  SERVICE
+  FEE
+  CUSTOM
+}
+
+enum DiscountType {
+  PERCENT
+  AMOUNT
+}
+
+enum PaymentMethodType {
+  CASH
+  CARD
+  TRANSFER
+  PIX
+  OTHER
+}
+
+// Ledger de estoque: todo movimento é imutável; saldo é projeção.
+enum StockMovementType {
+  INITIAL
+  PURCHASE
+  ISSUE_TO_JOB
+  SALE
+  RETURN_IN
+  ADJUSTMENT
+  TRANSFER
+}
+
+enum TaxType {
+  PERCENT
+  FIXED
+}
+
+enum CustomFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  DATE
+  DATETIME
+  BOOLEAN
+  SELECT
+  MULTISELECT
+  CHECKBOX
+  COLOR
+  LINK
+}
+
+// =============================================================================
+// TENANCY / IDENTIDADE / RBAC
+// =============================================================================
+
+model Tenant {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String       @unique
+  status    TenantStatus @default(TRIAL)
+  plan      String?
+  document  String?
+  timezone  String       @default("America/Sao_Paulo")
+  locale    String       @default("pt-BR")
+  currency  String       @default("BRL")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  deletedAt DateTime?
+}
+
+// Identidade global: um usuário pode participar de vários tenants via Membership.
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique
+  passwordHash    String?
+  name            String
+  phone           String?
+  avatarUrl       String?
+  locale          String    @default("pt-BR")
+  timezone        String    @default("America/Sao_Paulo")
+  isPlatformAdmin Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  memberships         Membership[]
+  jobCardsAssigned    JobCard[]          @relation("JobAssignedTo")
+  jobCardsAdvisor     JobCard[]          @relation("JobAdvisor")
+  jobsOn              JobMechanic[]
+  appointments        Appointment[]      @relation("AppointmentAssigned")
+  inspections         Inspection[]       @relation("InspectionInspector")
+}
+
+model Branch {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid @map("tenant_id")
+  name      String
+  code      String?
+  phone     String?
+  email     String?
+  address   String?
+  city      String?
+  state     String?
+  zip       String?
+  country   String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  memberships    Membership[]
+  appointments   Appointment[]
+  jobs           JobCard[]
+  inspections    Inspection[]
+  invoices       Invoice[]
+  stockLocations StockLocation[]
+  expenses       Expense[]
+  businessHours  BusinessHour[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("branches")
+}
+
+model Membership {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @db.Uuid @map("tenant_id")
+  userId    String           @db.Uuid
+  branchId  String?          @db.Uuid
+  status    MembershipStatus @default(ACTIVE)
+  isOwner   Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch Branch?          @relation(fields: [branchId], references: [id])
+  roles  MembershipRole[]
+
+  @@unique([tenantId, userId])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([branchId])
+  @@map("memberships")
+}
+
+model Role {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String?   @db.Uuid @map("tenant_id")
+  name        String
+  slug        String
+  description String?
+  scope       RoleScope @default(TENANT)
+  isSystem    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  permissions RolePermission[]
+  memberships MembershipRole[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(uuid()) @db.Uuid
+  code        String  @unique // ex.: "jobcard.view", "invoice.approve"
+  feature     String
+  action      String // view | view_own | create | edit | delete | approve
+  description String?
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @db.Uuid
+  permissionId String @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model MembershipRole {
+  membershipId String @db.Uuid
+  roleId       String @db.Uuid
+
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([membershipId, roleId])
+  @@map("membership_roles")
+}
+
+// =============================================================================
+// CLIENTES / VEÍCULOS / CATÁLOGOS
+// =============================================================================
+
+model Customer {
+  id        String       @id @default(uuid()) @db.Uuid
+  tenantId  String       @db.Uuid @map("tenant_id")
+  type      CustomerType @default(INDIVIDUAL)
+  name      String
+  document  String?
+  email     String?
+  phone     String?
+  address   String?
+  city      String?
+  state     String?
+  zip       String?
+  country   String?
+  notes     String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  deletedAt DateTime?
+
+  vehicles     Vehicle[]
+  appointments Appointment[]
+  jobs         JobCard[]
+  quotations   Quotation[]
+  invoices     Invoice[]
+
+  @@index([tenantId])
+  @@index([tenantId, name])
+  @@map("customers")
+}
+
+model VehicleBrand {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid @map("tenant_id")
+  name      String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  models   VehicleModel[]
+  vehicles Vehicle[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("vehicle_brands")
+}
+
+model VehicleModel {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid @map("tenant_id")
+  brandId   String    @db.Uuid
+  name      String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  brand    VehicleBrand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  vehicles Vehicle[]
+
+  @@unique([brandId, name])
+  @@index([tenantId])
+  @@map("vehicle_models")
+}
+
+model VehicleType {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid @map("tenant_id")
+  name      String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  vehicles Vehicle[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("vehicle_types")
+}
+
+model VehicleColor {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid @map("tenant_id")
+  name      String
+  hex       String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  vehicles Vehicle[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("vehicle_colors")
+}
+
+model VehicleFuelType {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid @map("tenant_id")
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  vehicles Vehicle[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("vehicle_fuel_types")
+}
+
+model Vehicle {
+  id           String            @id @default(uuid()) @db.Uuid
+  tenantId     String            @db.Uuid @map("tenant_id")
+  customerId   String            @db.Uuid
+  brandId      String?           @db.Uuid
+  modelId      String?           @db.Uuid
+  fuelTypeId   String?           @db.Uuid
+  colorId      String?           @db.Uuid
+  typeId       String?           @db.Uuid
+  plate        String?
+  vin          String?
+  chassis      String?
+  engineNo     String?
+  year         Int?
+  transmission TransmissionType?
+  odometer     Decimal?          @db.Decimal(12, 2)
+  odometerUnit OdometerUnit      @default(KM)
+  notes        String?
+  isActive     Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  deletedAt    DateTime?
+
+  customer     Customer         @relation(fields: [customerId], references: [id])
+  brand        VehicleBrand?    @relation(fields: [brandId], references: [id])
+  model        VehicleModel?    @relation(fields: [modelId], references: [id])
+  fuelType     VehicleFuelType? @relation(fields: [fuelTypeId], references: [id])
+  color        VehicleColor?    @relation(fields: [colorId], references: [id])
+  type         VehicleType?     @relation(fields: [typeId], references: [id])
+  appointments Appointment[]
+  jobs         JobCard[]
+  inspections  Inspection[]
+  history      VehicleHistory[]
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([tenantId, plate])
+  @@map("vehicles")
+}
+
+model VehicleHistory {
+  id           String       @id @default(uuid()) @db.Uuid
+  tenantId     String       @db.Uuid @map("tenant_id")
+  vehicleId    String       @db.Uuid
+  jobCardId    String?      @db.Uuid
+  odometer     Decimal?     @db.Decimal(12, 2)
+  odometerUnit OdometerUnit @default(KM)
+  serviceDate  DateTime
+  summary      String?
+  createdAt    DateTime     @default(now())
+
+  vehicle Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  jobCard JobCard? @relation(fields: [jobCardId], references: [id])
+
+  @@index([tenantId])
+  @@index([vehicleId])
+  @@map("vehicle_history")
+}
+
+model ProductCategory {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid @map("tenant_id")
+  name      String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  services ServiceCatalog[]
+  parts    PartCatalog[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("product_categories")
+}
+
+model Unit {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @db.Uuid @map("tenant_id")
+  name        String
+  abbreviation String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  parts          PartCatalog[]
+  jobLines       JobLine[]
+  quotationLines QuotationLine[]
+  invoiceLines   InvoiceLine[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("units")
+}
+
+model Tax {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid @map("tenant_id")
+  name        String
+  rate        Decimal  @db.Decimal(6, 3)
+  type        TaxType  @default(PERCENT)
+  isInclusive Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  jobLineTaxes       JobLineTax[]
+  quotationLineTaxes QuotationLineTax[]
+  invoiceLineTaxes   InvoiceLineTax[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("taxes")
+}
+
+model ServiceCatalog {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @db.Uuid @map("tenant_id")
+  categoryId   String?   @db.Uuid
+  code         String?
+  name         String
+  description  String?
+  basePrice    Decimal   @default(0) @db.Decimal(14, 2)
+  standardTime Decimal?  @db.Decimal(8, 2)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  category       ProductCategory? @relation(fields: [categoryId], references: [id])
+  parts          ServicePart[]
+  jobLines       JobLine[]
+  quotationLines QuotationLine[]
+  invoiceLines   InvoiceLine[]
+
+  @@index([tenantId])
+  @@index([tenantId, name])
+  @@map("service_catalogs")
+}
+
+model PartCatalog {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @db.Uuid @map("tenant_id")
+  categoryId String?   @db.Uuid
+  unitId     String?   @db.Uuid
+  sku        String?
+  name       String
+  description String?
+  costPrice  Decimal   @default(0) @db.Decimal(14, 2)
+  salePrice  Decimal   @default(0) @db.Decimal(14, 2)
+  minStock   Decimal   @default(0) @db.Decimal(14, 3)
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  category      ProductCategory? @relation(fields: [categoryId], references: [id])
+  unit          Unit?            @relation(fields: [unitId], references: [id])
+  stockMovements StockMovement[]
+  stockBalances  StockBalance[]
+  serviceParts   ServicePart[]
+  jobLines       JobLine[]
+  quotationLines QuotationLine[]
+  invoiceLines   InvoiceLine[]
+
+  @@index([tenantId])
+  @@index([tenantId, sku])
+  @@map("part_catalogs")
+}
+
+model Supplier {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid @map("tenant_id")
+  name      String
+  document  String?
+  email     String?
+  phone     String?
+  notes     String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@map("suppliers")
+}
+
+// BOM: peças padrão consumidas por um serviço.
+model ServicePart {
+  id        String  @id @default(uuid()) @db.Uuid
+  tenantId  String  @db.Uuid @map("tenant_id")
+  serviceId String  @db.Uuid
+  partId    String  @db.Uuid
+  quantity  Decimal @default(1) @db.Decimal(14, 3)
+
+  service ServiceCatalog @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  part    PartCatalog    @relation(fields: [partId], references: [id])
+
+  @@unique([serviceId, partId])
+  @@index([tenantId])
+  @@map("service_parts")
+}
+
+// =============================================================================
+// ESTOQUE (ledger)
+// =============================================================================
+
+model StockLocation {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid @map("tenant_id")
+  branchId  String    @db.Uuid
+  name      String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  branch    Branch          @relation(fields: [branchId], references: [id])
+  movements StockMovement[]
+  balances  StockBalance[]
+
+  @@unique([branchId, name])
+  @@index([tenantId])
+  @@map("stock_locations")
+}
+
+model StockMovement {
+  id          String            @id @default(uuid()) @db.Uuid
+  tenantId    String            @db.Uuid @map("tenant_id")
+  branchId    String            @db.Uuid
+  locationId  String            @db.Uuid
+  partId      String            @db.Uuid
+  type        StockMovementType
+  quantity    Decimal           @db.Decimal(14, 3) // positivo = entrada; negativo = saída
+  unitCost    Decimal?          @db.Decimal(14, 2)
+  refType     String? // "job_card" | "purchase" | "sale" | ...
+  refId       String?           @db.Uuid
+  notes       String?
+  createdById String?           @db.Uuid
+  createdAt   DateTime          @default(now())
+
+  location StockLocation @relation(fields: [locationId], references: [id])
+  part     PartCatalog   @relation(fields: [partId], references: [id])
+
+  @@index([tenantId])
+  @@index([partId])
+  @@index([locationId])
+  @@index([refType, refId])
+  @@map("stock_movements")
+}
+
+// Projeção do ledger (atualizada na mesma transação). Nunca editada manualmente.
+model StockBalance {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid @map("tenant_id")
+  locationId String   @db.Uuid
+  partId     String   @db.Uuid
+  quantity   Decimal  @default(0) @db.Decimal(14, 3)
+  updatedAt  DateTime @updatedAt
+
+  location StockLocation @relation(fields: [locationId], references: [id])
+  part     PartCatalog   @relation(fields: [partId], references: [id])
+
+  @@unique([locationId, partId])
+  @@index([tenantId])
+  @@map("stock_balances")
+}
+
+// =============================================================================
+// AGENDAMENTO
+// =============================================================================
+
+model Appointment {
+  id             String            @id @default(uuid()) @db.Uuid
+  tenantId       String            @db.Uuid @map("tenant_id")
+  branchId       String            @db.Uuid
+  customerId     String?           @db.Uuid
+  vehicleId      String?           @db.Uuid
+  type           JobType
+  status         AppointmentStatus @default(SCHEDULED)
+  scheduledStart DateTime
+  scheduledEnd   DateTime?
+  assignedToId   String?           @db.Uuid
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  branch     Branch    @relation(fields: [branchId], references: [id])
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  vehicle    Vehicle?  @relation(fields: [vehicleId], references: [id])
+  assignedTo User?     @relation("AppointmentAssigned", fields: [assignedToId], references: [id])
+  jobs       JobCard[]
+
+  @@index([tenantId])
+  @@index([branchId, scheduledStart])
+  @@map("appointments")
+}
+
+model BusinessHour {
+  id        String  @id @default(uuid()) @db.Uuid
+  tenantId  String  @db.Uuid @map("tenant_id")
+  branchId  String  @db.Uuid
+  dayOfWeek Int // 0 = domingo ... 6 = sábado
+  openTime  String
+  closeTime String
+  isClosed  Boolean @default(false)
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([branchId, dayOfWeek])
+  @@index([tenantId])
+  @@map("business_hours")
+}
+
+model Holiday {
+  id       String    @id @default(uuid()) @db.Uuid
+  tenantId String    @db.Uuid @map("tenant_id")
+  branchId String?   @db.Uuid
+  date     DateTime  @db.Date
+  name     String
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([branchId])
+  @@map("holidays")
+}
+
+// =============================================================================
+// MOTOR DE INSPEÇÃO (template versionado)
+// =============================================================================
+
+model InspectionTemplate {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @db.Uuid @map("tenant_id")
+  name        String
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  versions InspectionTemplateVersion[]
+
+  @@index([tenantId])
+  @@map("inspection_templates")
+}
+
+model InspectionTemplateVersion {
+  id          String    @id @default(uuid()) @db.Uuid
+  templateId  String    @db.Uuid
+  version     Int
+  publishedAt DateTime?
+
+  template    InspectionTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  sections    InspectionSection[]
+  inspections Inspection[]
+
+  @@unique([templateId, version])
+  @@map("inspection_template_versions")
+}
+
+model InspectionSection {
+  id          String             @id @default(uuid()) @db.Uuid
+  versionId   String             @db.Uuid
+  title       String
+  displayType SectionDisplayType @default(SECTION)
+  sequence    Int                @default(0)
+
+  version   InspectionTemplateVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  questions InspectionQuestion[]
+
+  @@index([versionId])
+  @@map("inspection_sections")
+}
+
+model InspectionQuestion {
+  id                   String       @id @default(uuid()) @db.Uuid
+  sectionId            String       @db.Uuid
+  code                 String?
+  label                String
+  type                 QuestionType
+  required             Boolean      @default(false)
+  sequence             Int          @default(0)
+  visibleToCustomer    Boolean      @default(true)
+  helpText             String?
+  conditionalParentId  String?      @db.Uuid
+  conditionalOperator  String? // eq | neq | gt | lt | in
+  conditionalValue     String?
+
+  section             InspectionSection         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  options             InspectionQuestionOption[]
+  answers             InspectionAnswer[]
+  conditionalParent   InspectionQuestion?       @relation("QuestionConditional", fields: [conditionalParentId], references: [id])
+  conditionalChildren InspectionQuestion[]      @relation("QuestionConditional")
+
+  @@index([sectionId])
+  @@map("inspection_questions")
+}
+
+model InspectionQuestionOption {
+  id         String @id @default(uuid()) @db.Uuid
+  questionId String @db.Uuid
+  label      String
+  value      String
+  sequence   Int    @default(0)
+
+  question InspectionQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@map("inspection_question_options")
+}
+
+model Inspection {
+  id                String            @id @default(uuid()) @db.Uuid
+  tenantId          String            @db.Uuid @map("tenant_id")
+  branchId          String            @db.Uuid
+  jobCardId         String?           @unique @db.Uuid
+  vehicleId         String            @db.Uuid
+  templateVersionId String?           @db.Uuid
+  inspectorId       String?           @db.Uuid
+  status            InspectionStatus  @default(PENDING)
+  startedAt         DateTime?
+  completedAt       DateTime?
+  notes             String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  branch          Branch                     @relation(fields: [branchId], references: [id])
+  jobCard         JobCard?                   @relation(fields: [jobCardId], references: [id])
+  vehicle         Vehicle                    @relation(fields: [vehicleId], references: [id])
+  templateVersion InspectionTemplateVersion? @relation(fields: [templateVersionId], references: [id])
+  inspector       User?                      @relation("InspectionInspector", fields: [inspectorId], references: [id])
+  answers         InspectionAnswer[]
+
+  @@index([tenantId])
+  @@index([vehicleId])
+  @@map("inspections")
+}
+
+model InspectionAnswer {
+  id             String         @id @default(uuid()) @db.Uuid
+  inspectionId   String         @db.Uuid
+  questionId     String         @db.Uuid
+  value          String?
+  result         InspectionResult @default(NOT_INSPECTED)
+  comment        String?
+  approvalStatus ApprovalStatus @default(NOT_REQUIRED)
+  approvedById   String?        @db.Uuid
+  approvedAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  inspection  Inspection                   @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  question    InspectionQuestion           @relation(fields: [questionId], references: [id])
+  attachments InspectionAnswerAttachment[]
+
+  @@unique([inspectionId, questionId])
+  @@index([inspectionId])
+  @@map("inspection_answers")
+}
+
+model InspectionAnswerAttachment {
+  id           String @id @default(uuid()) @db.Uuid
+  answerId     String @db.Uuid
+  attachmentId String @db.Uuid
+
+  answer     InspectionAnswer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  attachment Attachment       @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+
+  @@unique([answerId, attachmentId])
+  @@map("inspection_answer_attachments")
+}
+
+// =============================================================================
+// JOB CARD (OS unificada) + LINHAS
+// =============================================================================
+
+model JobCard {
+  id                String        @id @default(uuid()) @db.Uuid
+  tenantId          String        @db.Uuid @map("tenant_id")
+  branchId          String        @db.Uuid
+  number            String
+  type              JobType
+  status            JobStatus     @default(DRAFT)
+  priority          Int           @default(0)
+  customerId        String        @db.Uuid
+  vehicleId         String        @db.Uuid
+  appointmentId     String?       @db.Uuid
+  assignedToId      String?       @db.Uuid
+  advisorId         String?       @db.Uuid
+  odometerIn        Decimal?      @db.Decimal(12, 2)
+  odometerUnit      OdometerUnit  @default(KM)
+  fuelLevel         String?
+  customerComplaint String?
+  internalNotes     String?
+  discountType      DiscountType?
+  discountValue     Decimal       @default(0) @db.Decimal(14, 2)
+  subtotal          Decimal       @default(0) @db.Decimal(14, 2)
+  taxTotal          Decimal       @default(0) @db.Decimal(14, 2)
+  total             Decimal       @default(0) @db.Decimal(14, 2)
+  currency          String        @default("BRL")
+  scheduledAt       DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  deliveredAt       DateTime?
+  lockedAt          DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  deletedAt         DateTime?
+
+  branch         Branch              @relation(fields: [branchId], references: [id])
+  customer       Customer            @relation(fields: [customerId], references: [id])
+  vehicle        Vehicle             @relation(fields: [vehicleId], references: [id])
+  appointment    Appointment?        @relation(fields: [appointmentId], references: [id])
+  assignedTo     User?               @relation("JobAssignedTo", fields: [assignedToId], references: [id])
+  advisor        User?               @relation("JobAdvisor", fields: [advisorId], references: [id])
+  inspection     Inspection?
+  statusHistory  JobStatusHistory[]
+  mechanics      JobMechanic[]
+  lines          JobLine[]
+  checklist      JobChecklistItem[]
+  quotations     Quotation[]
+  invoices       Invoice[]
+  expenses       Expense[]
+  vehicleHistory VehicleHistory[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+  @@index([branchId, status])
+  @@index([customerId])
+  @@index([vehicleId])
+  @@map("job_cards")
+}
+
+model JobStatusHistory {
+  id          String    @id @default(uuid()) @db.Uuid
+  jobCardId   String    @db.Uuid
+  fromStatus  JobStatus?
+  toStatus    JobStatus
+  changedById String?   @db.Uuid
+  reason      String?
+  changedAt   DateTime  @default(now())
+
+  jobCard JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+
+  @@index([jobCardId])
+  @@map("job_status_history")
+}
+
+model JobMechanic {
+  id        String   @id @default(uuid()) @db.Uuid
+  jobCardId String   @db.Uuid
+  userId    String   @db.Uuid
+  role      String?
+  hours     Decimal? @db.Decimal(8, 2)
+
+  jobCard JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([jobCardId, userId])
+  @@map("job_mechanics")
+}
+
+model JobChecklistItem {
+  id            String    @id @default(uuid()) @db.Uuid
+  jobCardId     String    @db.Uuid
+  label         String
+  isDone        Boolean   @default(false)
+  sequence      Int       @default(0)
+  completedById String?   @db.Uuid
+  completedAt   DateTime?
+
+  jobCard JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+
+  @@index([jobCardId])
+  @@map("job_checklist_items")
+}
+
+model JobLine {
+  id                       String        @id @default(uuid()) @db.Uuid
+  jobCardId                String        @db.Uuid
+  type                     LineItemType
+  serviceId                String?       @db.Uuid
+  partId                   String?       @db.Uuid
+  description              String?
+  quantity                 Decimal       @default(1) @db.Decimal(14, 3)
+  unitId                   String?       @db.Uuid
+  unitPrice                Decimal       @default(0) @db.Decimal(14, 2)
+  discountType             DiscountType?
+  discountValue            Decimal       @default(0) @db.Decimal(14, 2)
+  taxBase                  Decimal       @default(0) @db.Decimal(14, 2)
+  taxAmount                Decimal       @default(0) @db.Decimal(14, 2)
+  total                    Decimal       @default(0) @db.Decimal(14, 2)
+  sourceInspectionAnswerId String?       @db.Uuid
+  sequence                 Int           @default(0)
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+
+  jobCard     JobCard       @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  service     ServiceCatalog? @relation(fields: [serviceId], references: [id])
+  part        PartCatalog?  @relation(fields: [partId], references: [id])
+  unit        Unit?         @relation(fields: [unitId], references: [id])
+  taxes       JobLineTax[]
+  invoiceLines InvoiceLine[]
+
+  @@index([jobCardId])
+  @@map("job_lines")
+}
+
+model JobLineTax {
+  id     String  @id @default(uuid()) @db.Uuid
+  lineId String  @db.Uuid
+  taxId  String  @db.Uuid
+  rate   Decimal @db.Decimal(6, 3)
+  base   Decimal @db.Decimal(14, 2)
+  amount Decimal @db.Decimal(14, 2)
+
+  line JobLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  tax  Tax     @relation(fields: [taxId], references: [id])
+
+  @@index([lineId])
+  @@map("job_line_taxes")
+}
+
+// =============================================================================
+// ORÇAMENTO / FATURA / PAGAMENTO
+// =============================================================================
+
+model Quotation {
+  id            String          @id @default(uuid()) @db.Uuid
+  tenantId      String          @db.Uuid @map("tenant_id")
+  branchId      String          @db.Uuid
+  jobCardId     String?         @db.Uuid
+  customerId    String          @db.Uuid
+  number        String
+  status        QuotationStatus @default(DRAFT)
+  validUntil    DateTime?
+  subtotal      Decimal         @default(0) @db.Decimal(14, 2)
+  discountTotal Decimal         @default(0) @db.Decimal(14, 2)
+  taxTotal      Decimal         @default(0) @db.Decimal(14, 2)
+  total         Decimal         @default(0) @db.Decimal(14, 2)
+  currency      String          @default("BRL")
+  notes         String?
+  createdById   String?         @db.Uuid
+  approvedById  String?         @db.Uuid
+  approvedAt    DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  jobCard  JobCard?         @relation(fields: [jobCardId], references: [id])
+  customer Customer         @relation(fields: [customerId], references: [id])
+  lines    QuotationLine[]
+  invoices Invoice[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+  @@index([status])
+  @@map("quotations")
+}
+
+model QuotationLine {
+  id            String        @id @default(uuid()) @db.Uuid
+  quotationId   String        @db.Uuid
+  type          LineItemType
+  serviceId     String?       @db.Uuid
+  partId        String?       @db.Uuid
+  description   String?
+  quantity      Decimal       @default(1) @db.Decimal(14, 3)
+  unitId        String?       @db.Uuid
+  unitPrice     Decimal       @default(0) @db.Decimal(14, 2)
+  discountType  DiscountType?
+  discountValue Decimal       @default(0) @db.Decimal(14, 2)
+  taxBase       Decimal       @default(0) @db.Decimal(14, 2)
+  taxAmount     Decimal       @default(0) @db.Decimal(14, 2)
+  total         Decimal       @default(0) @db.Decimal(14, 2)
+  sequence      Int           @default(0)
+
+  quotation     Quotation           @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  service       ServiceCatalog?     @relation(fields: [serviceId], references: [id])
+  part          PartCatalog?        @relation(fields: [partId], references: [id])
+  unit          Unit?               @relation(fields: [unitId], references: [id])
+  taxes         QuotationLineTax[]
+  invoiceLines  InvoiceLine[]
+
+  @@index([quotationId])
+  @@map("quotation_lines")
+}
+
+model QuotationLineTax {
+  id     String  @id @default(uuid()) @db.Uuid
+  lineId String  @db.Uuid
+  taxId  String  @db.Uuid
+  rate   Decimal @db.Decimal(6, 3)
+  base   Decimal @db.Decimal(14, 2)
+  amount Decimal @db.Decimal(14, 2)
+
+  line QuotationLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  tax  Tax           @relation(fields: [taxId], references: [id])
+
+  @@index([lineId])
+  @@map("quotation_line_taxes")
+}
+
+model Invoice {
+  id            String        @id @default(uuid()) @db.Uuid
+  tenantId      String        @db.Uuid @map("tenant_id")
+  branchId      String        @db.Uuid
+  jobCardId     String?       @db.Uuid
+  quotationId   String?       @db.Uuid
+  customerId    String        @db.Uuid
+  number        String
+  status        InvoiceStatus @default(DRAFT)
+  issueDate     DateTime      @default(now())
+  dueDate       DateTime?
+  subtotal      Decimal       @default(0) @db.Decimal(14, 2)
+  discountTotal Decimal       @default(0) @db.Decimal(14, 2)
+  taxTotal      Decimal       @default(0) @db.Decimal(14, 2)
+  total         Decimal       @default(0) @db.Decimal(14, 2)
+  amountPaid    Decimal       @default(0) @db.Decimal(14, 2)
+  currency      String        @default("BRL")
+  notes         String?
+  createdById   String?       @db.Uuid
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  branch    Branch        @relation(fields: [branchId], references: [id])
+  jobCard   JobCard?      @relation(fields: [jobCardId], references: [id])
+  quotation Quotation?    @relation(fields: [quotationId], references: [id])
+  customer  Customer      @relation(fields: [customerId], references: [id])
+  lines     InvoiceLine[]
+  payments  Payment[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id             String        @id @default(uuid()) @db.Uuid
+  invoiceId      String        @db.Uuid
+  type           LineItemType
+  serviceId      String?       @db.Uuid
+  partId         String?       @db.Uuid
+  description    String?
+  quantity       Decimal       @default(1) @db.Decimal(14, 3)
+  unitId         String?       @db.Uuid
+  unitPrice      Decimal       @default(0) @db.Decimal(14, 2)
+  discountType   DiscountType?
+  discountValue  Decimal       @default(0) @db.Decimal(14, 2)
+  taxBase        Decimal       @default(0) @db.Decimal(14, 2)
+  taxAmount      Decimal       @default(0) @db.Decimal(14, 2)
+  total          Decimal       @default(0) @db.Decimal(14, 2)
+  quotationLineId String?      @db.Uuid
+  jobLineId      String?       @db.Uuid
+  sequence       Int           @default(0)
+
+  invoice       Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  service       ServiceCatalog? @relation(fields: [serviceId], references: [id])
+  part          PartCatalog?    @relation(fields: [partId], references: [id])
+  unit          Unit?           @relation(fields: [unitId], references: [id])
+  quotationLine QuotationLine?  @relation(fields: [quotationLineId], references: [id])
+  jobLine       JobLine?        @relation(fields: [jobLineId], references: [id])
+  taxes         InvoiceLineTax[]
+
+  @@index([invoiceId])
+  @@map("invoice_lines")
+}
+
+model InvoiceLineTax {
+  id     String  @id @default(uuid()) @db.Uuid
+  lineId String  @db.Uuid
+  taxId  String  @db.Uuid
+  rate   Decimal @db.Decimal(6, 3)
+  base   Decimal @db.Decimal(14, 2)
+  amount Decimal @db.Decimal(14, 2)
+
+  line InvoiceLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  tax  Tax         @relation(fields: [taxId], references: [id])
+
+  @@index([lineId])
+  @@map("invoice_line_taxes")
+}
+
+model Payment {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @db.Uuid @map("tenant_id")
+  invoiceId    String    @db.Uuid
+  amount       Decimal   @db.Decimal(14, 2)
+  methodId     String?   @db.Uuid
+  paidAt       DateTime  @default(now())
+  reference    String?
+  notes        String?
+  receivedById String?   @db.Uuid
+  createdAt    DateTime  @default(now())
+
+  invoice Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  method  PaymentMethod? @relation(fields: [methodId], references: [id])
+
+  @@index([tenantId])
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+model PaymentMethod {
+  id        String            @id @default(uuid()) @db.Uuid
+  tenantId  String            @db.Uuid @map("tenant_id")
+  name      String
+  type      PaymentMethodType @default(CASH)
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  payments Payment[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("payment_methods")
+}
+
+model Expense {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @db.Uuid @map("tenant_id")
+  branchId    String    @db.Uuid
+  jobCardId   String?   @db.Uuid
+  category    String
+  description String?
+  amount      Decimal   @db.Decimal(14, 2)
+  expenseDate DateTime  @db.Date
+  createdById String?   @db.Uuid
+  createdAt   DateTime  @default(now())
+
+  branch  Branch   @relation(fields: [branchId], references: [id])
+  jobCard JobCard? @relation(fields: [jobCardId], references: [id])
+
+  @@index([tenantId])
+  @@index([branchId, expenseDate])
+  @@map("expenses")
+}
+
+// =============================================================================
+// ANEXOS / NOTAS / CAMPOS CUSTOMIZADOS / AUDITORIA / SEQUÊNCIAS
+// =============================================================================
+
+model Attachment {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @db.Uuid @map("tenant_id")
+  ownerType    String?
+  ownerId      String?   @db.Uuid
+  url          String
+  filename     String
+  mimeType     String?
+  sizeBytes    Int?
+  uploadedById String?   @db.Uuid
+  createdAt    DateTime  @default(now())
+
+  inspectionAnswerLinks InspectionAnswerAttachment[]
+
+  @@index([tenantId])
+  @@index([ownerType, ownerId])
+  @@map("attachments")
+}
+
+model Note {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @db.Uuid @map("tenant_id")
+  entityType String
+  entityId   String    @db.Uuid
+  body       String
+  isInternal Boolean   @default(true)
+  authorId   String?   @db.Uuid
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([entityType, entityId])
+  @@map("notes")
+}
+
+model CustomFieldset {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @db.Uuid @map("tenant_id")
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  definitions CustomFieldDefinition[]
+
+  @@index([tenantId])
+  @@map("custom_fieldsets")
+}
+
+model CustomFieldDefinition {
+  id            String          @id @default(uuid()) @db.Uuid
+  tenantId      String          @db.Uuid @map("tenant_id")
+  branchId      String?         @db.Uuid
+  fieldsetId    String?         @db.Uuid
+  entityType    String // "customer" | "vehicle" | "job_card" | ...
+  code          String
+  label         String
+  type          CustomFieldType
+  optionsJson   Json?
+  required      Boolean         @default(false)
+  sequence      Int             @default(0)
+  showOnPdf     Boolean         @default(false)
+  showOnPortal  Boolean         @default(false)
+  clientEditable Boolean        @default(true)
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  fieldset CustomFieldset?     @relation(fields: [fieldsetId], references: [id])
+  values   CustomFieldValue[]
+
+  @@unique([tenantId, entityType, code])
+  @@index([tenantId])
+  @@index([entityType])
+  @@map("custom_field_definitions")
+}
+
+model CustomFieldValue {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid @map("tenant_id")
+  entityType String
+  entityId   String   @db.Uuid
+  fieldId    String   @db.Uuid
+  value      String?
+  valueJson  Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  field CustomFieldDefinition @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([entityType, entityId, fieldId])
+  @@index([tenantId])
+  @@index([entityType, entityId])
+  @@map("custom_field_values")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String?  @db.Uuid @map("tenant_id")
+  actorId    String?  @db.Uuid
+  entityType String
+  entityId   String?  @db.Uuid
+  action     String
+  diffJson   Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+// Numeração transacional de documentos (job, orçamento, fatura). Incremento com lock.
+model NumberSequence {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid @map("tenant_id")
+  entity    String // "job_card" | "quotation" | "invoice"
+  prefix    String?
+  padding   Int      @default(6)
+  nextValue Int      @default(1)
+  format    String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, entity])
+  @@map("number_sequences")
+}
