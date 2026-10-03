@@ -123,6 +123,7 @@ DIRECT_URL="postgresql://...:5432/neondb?sslmode=require"
 - [x] **Fase 3 (padrão)**: slice `branches` completo no server (`services/branches.service.ts`, `dtos/*`, `/api/branches`, `/api/branches/[id]`, wrapper `runRoute`), validado (CRUD + isolamento RLS).
 - [x] **Fase 3 (lote 1)**: `customers`, `vehicles`, `suppliers`, `parts`, `expenses`, `appointments` (DTOs + services + rotas). Smoke test no Neon OK.
 - [x] **Fase 3 (lote 2)**: `users` (criação via Better Auth), `roles`, `inspection-templates`, `inspections`, `stock` (+ serviços comuns `number-sequence`, `line-calculator` e `job-cards.service` como dependência). Smoke test no Neon OK (inclui `issueToJob` recalculando a OS).
-- [ ] **Fase 3 (resto)**: faltam `job-cards` (rotas), `purchases`, `quotations`, `invoices`, `reports` (12/19 controllers prontos).
+- [x] **Fase 3 (lote 3 / fim)**: `job-cards` (rotas), `purchases`, `quotations`, `invoices` (pagamentos + documento HTML) e `reports`; health em `/api/health`. Smoke test no Neon OK (OS→orçamento→fatura PAID→documento; compra→estoque→despesa→cancelamento; relatórios). **Todos os controllers portados** (auth via Better Auth).
+- [ ] **Fase 5–8**: cross-cutting (headers), PDF/storage, testes/CI e descomissionar `apps/api`.
 - [x] **Fase 4**: rewiring do web — `lib/auth-client.ts`, `apiFetch` com `credentials: 'include'` e base `/api`, `auth-provider` via `authClient.useSession`, `GET /api/me`, middleware ativo. Validado: login → cookie → `getSession`; `next build` OK (rotas tipadas).
 - [ ] Fases 5–8.
