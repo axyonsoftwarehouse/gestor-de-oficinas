@@ -217,6 +217,8 @@ model Tenant {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
   deletedAt DateTime?
+
+  @@map("tenants")
 }
 
 // Identidade global: um usuário pode participar de vários tenants via Membership.
@@ -241,6 +243,8 @@ model User {
   jobsOn              JobMechanic[]
   appointments        Appointment[]      @relation("AppointmentAssigned")
   inspections         Inspection[]       @relation("InspectionInspector")
+
+  @@map("users")
 }
 
 model Branch {
@@ -1424,4 +1428,19 @@ model NumberSequence {
 
   @@unique([tenantId, entity])
   @@map("number_sequences")
+}
+
+// Refresh tokens rotativos (hash SHA-256 armazenado; nunca o token em claro).
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid @map("user_id")
+  tenantId  String?   @db.Uuid @map("tenant_id")
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("refresh_tokens")
 }
