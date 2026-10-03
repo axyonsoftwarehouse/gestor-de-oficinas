@@ -125,7 +125,6 @@ Cinco papéis de sistema por tenant (templates iniciais):
 ```
 apps/
   web/            # Next full stack (app + API + auth)   <-- produto
-  api/            # NestJS legado (a descomissionar)
   mobile/         # Expo (stub)
 packages/
   database/       # schema Prisma, migrations, seed, RLS
@@ -197,7 +196,6 @@ docs/             # documentação
 | CI/CD | Pipeline (typecheck, build, migrate deploy) + envs na Vercel | **P0** |
 | PDF headless | Serviço de PDF consumindo `GET /invoices/:id/document` (HTML pronto) | P1 |
 | Storage | Anexos/avatares (Vercel Blob / R2 / Neon Object Storage) | P2 |
-| Descomissionar `apps/api` | Remover NestJS, ajustar `turbo.json`/scripts | P1 |
 | Backups | Dump offsite (Neon free não tem backup agendado) | **P0** |
 | Rotação de segredos | Rotacionar senha do Neon e do `app_gestor` | **P0** |
 
@@ -217,7 +215,6 @@ docs/             # documentação
 - **Refino de UI** por tela (abas de settings, etc.).
 
 ### 6.4 Dívidas técnicas conhecidas
-- `apps/api` (NestJS) ainda presente; só deve sair após portar os testes.
 - Coluna `passwordHash` legada em `users` (substituída pelo `account` do Better Auth).
 - `TENANT_MODELS` (extensão Prisma) não inclui `Purchase` (RLS já cobre; corrigir
   a defesa em profundidade).

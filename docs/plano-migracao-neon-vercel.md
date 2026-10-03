@@ -128,6 +128,6 @@ DIRECT_URL="postgresql://...:5432/neondb?sslmode=require"
 - [ ] **Fase 6**: PDF headless e storage.
 - [x] **Fase 7 (testes/CI)**: Vitest no web com banco de teste dedicado (Neon branch ou Postgres local): `globalSetup` aplica migrations + papel + RLS + limpeza; specs `rls`, `flows` e `auth` (8 testes) validados. CI em `.github/workflows/ci.yml` (Postgres service, typecheck, build e testes).
 - [x] **Deploy (Vercel)**: `apps/web/vercel.json` (região `gru1`, build via Turbo filtrando `@gestor/web`), `docs/deploy-vercel.md` (runbook) e `.github/workflows/migrate.yml` (migrations manuais). Comando de build validado localmente (3 tasks).
-- [ ] **Fase 8**: descomissionar `apps/api` e ajustar scripts.
+- [x] **Fase 8**: `apps/api` (NestJS) removido; `.env`/`.env.example` limpos das variáveis legadas de API/JWT; `AGENTS.md` atualizado. `pnpm typecheck` (6 tasks) e build do web verdes.
 - [x] **Fase 4**: rewiring do web — `lib/auth-client.ts`, `apiFetch` com `credentials: 'include'` e base `/api`, `auth-provider` via `authClient.useSession`, `GET /api/me`, middleware ativo. Validado: login → cookie → `getSession`; `next build` OK (rotas tipadas).
 - [ ] Fases 5–8.
