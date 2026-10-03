@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DiscountType, JobStatus, Prisma } from '@prisma/client';
+import { JobStatus, Prisma } from '@prisma/client';
 import { requireTenantId } from '@gestor/database';
 import { PrismaService } from '../../prisma/prisma.service';
+import { LineCalculatorService } from '../../common/services/line-calculator.service';
 import { NumberSequenceService } from '../../common/services/number-sequence.service';
 import type { AssignMechanicDto } from './dto/assign-mechanic.dto';
 import type { CreateJobCardDto } from './dto/create-job-card.dto';
@@ -50,19 +51,12 @@ const detailInclude = {
   _count: { select: { quotations: true, invoices: true } },
 } satisfies Prisma.JobCardInclude;
 
-interface AmountInput {
-  quantity: number;
-  unitPrice: number;
-  discountType?: DiscountType | null;
-  discountValue: number;
-  taxIds?: string[];
-}
-
 @Injectable()
 export class JobCardsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly numberSequence: NumberSequenceService,
+    private readonly lineCalculator: LineCalculatorService,
   ) {}
 
   async create(dto: CreateJobCardDto, userId: string) {
@@ -200,7 +194,7 @@ export class JobCardsService {
   async addLine(jobCardId: string, dto: CreateJobLineDto) {
     await this.assertJob(jobCardId);
 
-    const amounts = await this.computeAmounts({
+    const amounts = await this.lineCalculator.calculate({
       quantity: dto.quantity ?? 1,
       unitPrice: dto.unitPrice ?? 0,
       discountType: dto.discountType ?? null,
@@ -241,7 +235,7 @@ export class JobCardsService {
     if (!existing) throw new NotFoundException('Item da OS não encontrado');
 
     const effectiveTaxIds = dto.taxIds ?? existing.taxes.map((tax) => tax.taxId);
-    const amounts = await this.computeAmounts({
+    const amounts = await this.lineCalculator.calculate({
       quantity: dto.quantity ?? Number(existing.quantity),
       unitPrice: dto.unitPrice ?? Number(existing.unitPrice),
       discountType: dto.discountType ?? existing.discountType,
@@ -313,46 +307,6 @@ export class JobCardsService {
     });
     if (!job) throw new NotFoundException('OS não encontrada');
     return job;
-  }
-
-  private async computeAmounts(input: AmountInput) {
-    const quantity = new Prisma.Decimal(input.quantity);
-    const unitPrice = new Prisma.Decimal(input.unitPrice);
-    const gross = quantity.mul(unitPrice);
-
-    const discountValue = new Prisma.Decimal(input.discountValue);
-    const discount =
-      input.discountType === 'PERCENT'
-        ? gross.mul(discountValue).div(100)
-        : input.discountType === 'AMOUNT'
-          ? discountValue
-          : new Prisma.Decimal(0);
-
-    const base = gross.minus(discount);
-
-    const taxes = input.taxIds?.length
-      ? await this.prisma.client.tax.findMany({
-          where: { id: { in: input.taxIds }, isActive: true },
-        })
-      : [];
-
-    let taxAmount = new Prisma.Decimal(0);
-    const taxRows = taxes.map((tax) => {
-      const rate = new Prisma.Decimal(tax.rate);
-      const amount = tax.type === 'PERCENT' ? base.mul(rate).div(100) : rate;
-      taxAmount = taxAmount.plus(amount);
-      return { taxId: tax.id, rate, base, amount };
-    });
-
-    return {
-      quantity,
-      unitPrice,
-      discountValue,
-      base,
-      taxAmount,
-      total: base.plus(taxAmount),
-      taxRows,
-    };
   }
 
   private async recalcTotals(jobCardId: string): Promise<void> {

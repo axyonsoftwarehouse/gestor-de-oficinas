@@ -11,7 +11,11 @@ import { HealthModule } from './health/health.module';
 import { AppointmentsModule } from './modules/appointments/appointments.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { InspectionsModule } from './modules/inspections/inspections.module';
+import { InvoicesModule } from './modules/invoices/invoices.module';
 import { JobCardsModule } from './modules/job-cards/job-cards.module';
+import { PartsModule } from './modules/parts/parts.module';
+import { QuotationsModule } from './modules/quotations/quotations.module';
+import { StockModule } from './modules/stock/stock.module';
 import { VehiclesModule } from './modules/vehicles/vehicles.module';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -33,6 +37,10 @@ import { PrismaModule } from './prisma/prisma.module';
     AppointmentsModule,
     InspectionsModule,
     JobCardsModule,
+    QuotationsModule,
+    InvoicesModule,
+    PartsModule,
+    StockModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
