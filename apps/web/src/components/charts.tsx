@@ -71,7 +71,7 @@ export function DonutChart({
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="#EEF1F7"
+            stroke="rgb(var(--surface-line))"
             strokeWidth={thickness}
           />
           {total > 0 &&

@@ -1,70 +1,63 @@
 import type { Config } from 'tailwindcss';
 
 /**
- * Tema inspirado no FinTrust UI Kit:
- * - Primário azul #2F80ED, secundário verde #4CE364 / lime #ABE85F
- * - Texto navy #233145, mutado #8E98A7
- * - Fundo de página #F6F7FB, borda #DFE5F1
- * A escala `slate` é remapeada para os tons do kit, então as telas existentes
- * que usam `slate-*` já herdam a nova paleta.
+ * Tema inspirado no FinTrust UI Kit, com suporte a Light/Dark via CSS variables.
+ * Os valores ficam em globals.css (`:root` e `.dark`). A escala `slate` também é
+ * remapeada para os tons do kit, então as telas existentes herdam o tema inteiro.
  */
+const rgb = (variable: string): string => `rgb(var(${variable}) / <alpha-value>)`;
+
 const config: Config = {
+  darkMode: 'class',
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
         brand: {
-          DEFAULT: '#2F80ED',
-          dark: '#2975E8',
-          light: '#EAF0F8',
-          soft: '#F5F9FF',
+          DEFAULT: rgb('--brand'),
+          dark: rgb('--brand-dark'),
+          light: rgb('--brand-light'),
+          soft: rgb('--brand-soft'),
         },
         accent: {
-          DEFAULT: '#4CE364',
-          lime: '#ABE85F',
-          green: '#12B76A',
+          DEFAULT: rgb('--accent'),
+          lime: rgb('--accent-lime'),
+          green: rgb('--accent-green'),
         },
         ink: {
-          DEFAULT: '#233145',
-          muted: '#8E98A7',
-          soft: '#B1B5C3',
-          strong: '#141736',
+          DEFAULT: rgb('--ink'),
+          muted: rgb('--ink-muted'),
+          soft: rgb('--ink-soft'),
+          strong: rgb('--ink-strong'),
         },
         surface: {
-          DEFAULT: '#FFFFFF',
-          page: '#F6F7FB',
-          soft: '#F8F9FC',
-          line: '#DFE5F1',
+          DEFAULT: rgb('--surface'),
+          page: rgb('--surface-page'),
+          soft: rgb('--surface-soft'),
+          line: rgb('--surface-line'),
         },
         state: {
-          success: '#12B76A',
-          warning: '#F2C94C',
-          danger: '#EB5757',
-          info: '#2F80ED',
+          success: rgb('--state-success'),
+          warning: rgb('--state-warning'),
+          danger: rgb('--state-danger'),
+          info: rgb('--state-info'),
         },
         slate: {
-          50: '#F6F7FB',
-          100: '#EEF1F7',
-          200: '#DFE5F1',
-          300: '#C9D2E0',
-          400: '#A9B4C4',
-          500: '#8E98A7',
-          600: '#5D6B80',
-          700: '#3A4A61',
-          800: '#233145',
-          900: '#1A2536',
-          950: '#141736',
+          50: rgb('--slate-50'),
+          100: rgb('--slate-100'),
+          200: rgb('--slate-200'),
+          300: rgb('--slate-300'),
+          400: rgb('--slate-400'),
+          500: rgb('--slate-500'),
+          600: rgb('--slate-600'),
+          700: rgb('--slate-700'),
+          800: rgb('--slate-800'),
+          900: rgb('--slate-900'),
+          950: rgb('--slate-950'),
         },
       },
       fontFamily: {
-        sans: [
-          'Inter',
-          'ui-sans-serif',
-          'system-ui',
-          '-apple-system',
-          'Segoe UI',
-          'sans-serif',
-        ],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
       },
       borderRadius: {
         lg: '0.625rem',
@@ -73,7 +66,7 @@ const config: Config = {
       },
       boxShadow: {
         card: '0 1px 2px rgba(35, 49, 69, 0.04), 0 1px 3px rgba(35, 49, 69, 0.06)',
-        pop: '0 12px 32px rgba(35, 49, 69, 0.12)',
+        pop: '0 12px 32px rgba(15, 20, 30, 0.28)',
       },
     },
   },

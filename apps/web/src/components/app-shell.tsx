@@ -25,6 +25,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useAuth } from './auth-provider';
+import { ThemeToggle } from './theme-toggle';
 import { cn } from './ui';
 
 const NAV = [
@@ -60,7 +61,7 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
 
   return (
     <div className="flex min-h-screen bg-surface-page">
-      <aside className="hidden w-64 flex-col border-r border-surface-line bg-white md:flex">
+      <aside className="hidden w-64 flex-col border-r border-surface-line bg-surface md:flex">
         <div className="flex items-center gap-2.5 px-5 py-5">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand text-white">
             <Wrench size={18} />
@@ -106,7 +107,7 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between gap-4 border-b border-surface-line bg-white px-6 py-3">
+        <header className="flex items-center justify-between gap-4 border-b border-surface-line bg-surface px-6 py-3">
           <div className="relative w-full max-w-sm">
             <Search
               size={16}
@@ -118,7 +119,8 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
             />
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
             <button className="relative text-ink-muted transition hover:text-ink">
               <Bell size={18} />
               <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-state-danger" />

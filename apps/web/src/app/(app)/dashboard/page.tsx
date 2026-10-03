@@ -123,7 +123,7 @@ export default function DashboardPage(): JSX.Element {
         subtitle="Visão geral da oficina"
         actions={
           <Link href="/invoices">
-            <span className="rounded-lg border border-surface-line bg-white px-3.5 py-2 text-sm font-medium text-ink hover:bg-surface-soft">
+            <span className="rounded-lg border border-surface-line bg-surface px-3.5 py-2 text-sm font-medium text-ink hover:bg-surface-soft">
               Ver faturas
             </span>
           </Link>

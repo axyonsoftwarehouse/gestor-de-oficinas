@@ -22,7 +22,7 @@ export function Button({
   const variants: Record<ButtonVariant, string> = {
     primary: 'bg-brand text-white shadow-sm hover:bg-brand-dark',
     secondary:
-      'border border-surface-line bg-white text-ink hover:bg-surface-soft',
+      'border border-surface-line bg-surface text-ink hover:bg-surface-soft',
     danger: 'bg-state-danger text-white shadow-sm hover:brightness-95',
     ghost: 'text-ink-muted hover:bg-surface-soft hover:text-ink',
   };
@@ -43,7 +43,7 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>): JSX.Element
     <input
       {...props}
       className={cn(
-        'w-full rounded-lg border border-surface-line bg-white px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-soft focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:bg-surface-page disabled:text-ink-muted',
+        'w-full rounded-lg border border-surface-line bg-surface px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-soft focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:bg-surface-page disabled:text-ink-muted',
         props.className,
       )}
     />
@@ -55,7 +55,7 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>): JSX.Elem
     <select
       {...props}
       className={cn(
-        'w-full rounded-lg border border-surface-line bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20',
+        'w-full rounded-lg border border-surface-line bg-surface px-3 py-2 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20',
         props.className,
       )}
     />
@@ -67,7 +67,7 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>): JS
     <textarea
       {...props}
       className={cn(
-        'w-full rounded-lg border border-surface-line bg-white px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-soft focus:border-brand focus:ring-2 focus:ring-brand/20',
+        'w-full rounded-lg border border-surface-line bg-surface px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-soft focus:border-brand focus:ring-2 focus:ring-brand/20',
         props.className,
       )}
     />
@@ -102,7 +102,7 @@ export function Card({
   return (
     <div
       className={cn(
-        'rounded-xl border border-surface-line bg-white shadow-card',
+        'rounded-xl border border-surface-line bg-surface shadow-card',
         className,
       )}
     >
@@ -120,10 +120,10 @@ export function Badge({
 }): JSX.Element {
   const tones = {
     slate: 'bg-surface-page text-ink-muted',
-    green: 'bg-[#ECFCE4] text-[#3E8E1F]',
-    amber: 'bg-[#FFF5E0] text-[#B78103]',
-    red: 'bg-[#FFECEC] text-[#D64545]',
-    blue: 'bg-brand-light text-brand-dark',
+    green: 'bg-state-success/15 text-state-success',
+    amber: 'bg-state-warning/20 text-state-warning',
+    red: 'bg-state-danger/15 text-state-danger',
+    blue: 'bg-brand/15 text-brand-dark',
   } as const;
   return (
     <span
@@ -173,7 +173,7 @@ export function Modal({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 p-4 backdrop-blur-sm">
-      <div className="mt-16 w-full max-w-lg rounded-xl bg-white shadow-pop">
+      <div className="mt-16 w-full max-w-lg rounded-xl bg-surface shadow-pop">
         <div className="flex items-center justify-between border-b border-surface-line px-5 py-3.5">
           <h2 className="text-sm font-semibold text-ink">{title}</h2>
           <button

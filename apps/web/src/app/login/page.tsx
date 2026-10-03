@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Wrench } from 'lucide-react';
 import { useAuth } from '@/components/auth-provider';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Button, Card, ErrorText, Field, Input } from '@/components/ui';
 
 export default function LoginPage(): JSX.Element {
@@ -29,7 +30,10 @@ export default function LoginPage(): JSX.Element {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-page p-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-surface-page p-4">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-3">
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand text-white">
