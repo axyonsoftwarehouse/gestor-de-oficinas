@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  BETTER_AUTH_SECRET: ci-secret-ci-secret-ci-secret-ci-secret
+  BETTER_AUTH_URL: http://localhost:3000
+  DATABASE_URL: postgresql://gestor:gestor@localhost:5432/gestor?schema=public
+  DIRECT_URL: postgresql://gestor:gestor@localhost:5432/gestor?schema=public
+  APP_DATABASE_URL: postgresql://app_gestor:app_gestor@localhost:5432/gestor?schema=public
+  TEST_DATABASE_URL: postgresql://gestor:gestor@localhost:5432/gestor?schema=public
+  TEST_DIRECT_URL: postgresql://gestor:gestor@localhost:5432/gestor?schema=public
+  TEST_APP_DATABASE_URL: postgresql://app_gestor:app_gestor@localhost:5432/gestor?schema=public
+
+jobs:
+  quality:
+    name: Typecheck, build e testes
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gestor
+          POSTGRES_PASSWORD: gestor
+          POSTGRES_DB: gestor
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gestor"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Habilitar pnpm
+        run: corepack enable
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Gerar Prisma Client
+        run: pnpm --filter @gestor/database db:generate
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build do web
+        run: pnpm --filter @gestor/web build
+
+      - name: Testes
+        run: |
+          touch .env
+          pnpm --filter @gestor/web test
