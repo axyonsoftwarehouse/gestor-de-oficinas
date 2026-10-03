@@ -261,4 +261,70 @@ export class InvoicesService {
     if (!invoice) throw new NotFoundException('Fatura não encontrada');
     return invoice;
   }
+
+  /** Renderiza a fatura em HTML (consumível por um serviço headless de PDF). */
+  async renderDocument(id: string): Promise<string> {
+    const invoice = await this.findOne(id);
+    const currency = invoice.currency || 'BRL';
+    const money = (value: unknown): string =>
+      new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(Number(value));
+
+    const lineRows = invoice.lines
+      .map(
+        (line) =>
+          `<tr><td>${this.escape(line.description ?? line.type)}</td><td class="num">${line.quantity}</td><td class="num">${money(line.unitPrice)}</td><td class="num">${money(line.total)}</td></tr>`,
+      )
+      .join('');
+
+    const paymentRows = invoice.payments
+      .map(
+        (payment) =>
+          `<tr><td>${payment.paidAt.toISOString().slice(0, 10)}</td><td>${this.escape(payment.reference ?? '-')}</td><td class="num">${money(payment.amount)}</td></tr>`,
+      )
+      .join('');
+
+    return `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Fatura ${this.escape(invoice.number)}</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 32px; color: #0f172a; }
+  h1 { font-size: 20px; margin: 0; }
+  .muted { color: #64748b; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+  th, td { border-bottom: 1px solid #e2e8f0; padding: 8px; text-align: left; font-size: 13px; }
+  .num { text-align: right; }
+  .totals { margin-top: 16px; width: 280px; margin-left: auto; }
+  .totals td { border: none; }
+</style>
+</head>
+<body>
+  <h1>Fatura ${this.escape(invoice.number)}</h1>
+  <p class="muted">Cliente: ${this.escape(invoice.customer?.name ?? '')} &middot; Emitida em ${invoice.issueDate.toISOString().slice(0, 10)}</p>
+  <table>
+    <thead><tr><th>Descrição</th><th class="num">Qtd</th><th class="num">Unitário</th><th class="num">Total</th></tr></thead>
+    <tbody>${lineRows}</tbody>
+  </table>
+  <table class="totals">
+    <tr><td>Subtotal</td><td class="num">${money(invoice.subtotal)}</td></tr>
+    <tr><td>Descontos</td><td class="num">- ${money(invoice.discountTotal)}</td></tr>
+    <tr><td>Impostos</td><td class="num">${money(invoice.taxTotal)}</td></tr>
+    <tr><td><strong>Total</strong></td><td class="num"><strong>${money(invoice.total)}</strong></td></tr>
+    <tr><td>Pago</td><td class="num">${money(invoice.amountPaid)}</td></tr>
+  </table>
+  ${paymentRows ? `<h2 style="font-size:14px;margin-top:24px">Pagamentos</h2><table><thead><tr><th>Data</th><th>Referência</th><th class="num">Valor</th></tr></thead><tbody>${paymentRows}</tbody></table>` : ''}
+</body>
+</html>`;
+  }
+
+  private escape(value: string): string {
+    const map: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+    };
+    return value.replace(/[&<>"]/g, (char) => map[char] ?? char);
+  }
 }

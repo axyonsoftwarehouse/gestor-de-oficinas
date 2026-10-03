@@ -28,6 +28,7 @@ export const PERMISSION_CATALOG = {
   quotation: ['view', 'view_own', 'create', 'edit', 'delete', 'approve'],
   invoice: ['view', 'view_own', 'create', 'edit', 'delete', 'approve'],
   payment: ['view', 'create', 'delete'],
+  purchase: ['view', 'create', 'edit', 'delete', 'approve'],
   service: ['view', 'create', 'edit', 'delete'],
   part: ['view', 'create', 'edit', 'delete'],
   stock: ['view', 'create', 'edit', 'delete', 'approve'],

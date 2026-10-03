@@ -11,7 +11,7 @@ import type { QueryMovementDto } from './dto/query-movement.dto';
 
 const INBOUND: StockMovementType[] = ['INITIAL', 'PURCHASE', 'RETURN_IN'];
 
-interface MovementInput {
+export interface MovementInput {
   locationId: string;
   partId: string;
   type: StockMovementType;
@@ -142,7 +142,7 @@ export class StockService {
     return INBOUND.includes(type) ? value.abs() : value.abs().negated();
   }
 
-  private async recordMovement(input: MovementInput) {
+  async recordMovement(input: MovementInput) {
     return this.prisma.client.$transaction(async (tx) => {
       const location = await tx.stockLocation.findFirst({
         where: { id: input.locationId },

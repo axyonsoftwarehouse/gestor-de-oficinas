@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -34,6 +35,13 @@ export class InvoicesController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.invoicesService.createFromJobCard(jobCardId, user.userId);
+  }
+
+  @Get(':id/document')
+  @RequirePermissions('invoice.view')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  renderDocument(@Param('id', ParseUUIDPipe) id: string) {
+    return this.invoicesService.renderDocument(id);
   }
 
   @Get(':id')

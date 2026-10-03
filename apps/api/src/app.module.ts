@@ -10,12 +10,16 @@ import { TenantContextInterceptor } from './common/interceptors/tenant-context.i
 import { HealthModule } from './health/health.module';
 import { AppointmentsModule } from './modules/appointments/appointments.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { ExpensesModule } from './modules/expenses/expenses.module';
 import { InspectionsModule } from './modules/inspections/inspections.module';
 import { InvoicesModule } from './modules/invoices/invoices.module';
 import { JobCardsModule } from './modules/job-cards/job-cards.module';
 import { PartsModule } from './modules/parts/parts.module';
+import { PurchasesModule } from './modules/purchases/purchases.module';
 import { QuotationsModule } from './modules/quotations/quotations.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { StockModule } from './modules/stock/stock.module';
+import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { VehiclesModule } from './modules/vehicles/vehicles.module';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -41,6 +45,10 @@ import { PrismaModule } from './prisma/prisma.module';
     InvoicesModule,
     PartsModule,
     StockModule,
+    SuppliersModule,
+    ExpensesModule,
+    PurchasesModule,
+    ReportsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

@@ -62,7 +62,8 @@ declare
     'custom_field_definitions',
     'custom_field_values',
     'audit_logs',
-    'number_sequences'
+    'number_sequences',
+    'purchases'
   ];
 begin
   foreach t in array tabelas loop
