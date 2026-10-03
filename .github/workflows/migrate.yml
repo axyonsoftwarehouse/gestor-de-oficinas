@@ -1,0 +1,29 @@
+name: Migrate (produção)
+
+# Manual por padrão para evitar corrida com o deploy da Vercel.
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Habilitar pnpm
+        run: corepack enable
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Aplicar migrations
+        run: pnpm --filter @gestor/database db:deploy:direct
+        env:
+          # Secret do repositório com a conexão DIRETA do Neon (porta 5432).
+          DATABASE_URL: ${{ secrets.PROD_DIRECT_URL }}
+          DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+          APP_DATABASE_URL: ${{ secrets.PROD_DIRECT_URL }}
