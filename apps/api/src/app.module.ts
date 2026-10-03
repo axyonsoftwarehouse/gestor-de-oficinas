@@ -2,11 +2,13 @@ import { join } from 'node:path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { CoreModule } from './common/core.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { TenantContextInterceptor } from './common/interceptors/tenant-context.interceptor';
+import { validateEnv } from './config/env.validation';
 import { HealthModule } from './health/health.module';
 import { AppointmentsModule } from './modules/appointments/appointments.module';
 import { BranchesModule } from './modules/branches/branches.module';
@@ -28,11 +30,13 @@ import { PrismaModule } from './prisma/prisma.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      validate: validateEnv,
       envFilePath: [
         join(process.cwd(), '.env'),
         join(process.cwd(), '..', '..', '.env'),
       ],
     }),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 300 }]),
     PrismaModule,
     CoreModule,
     AuthModule,
@@ -53,6 +57,7 @@ import { PrismaModule } from './prisma/prisma.module';
     ReportsModule,
   ],
   providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
