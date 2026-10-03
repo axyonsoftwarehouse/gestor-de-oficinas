@@ -19,7 +19,8 @@
     "db:seed": "pnpm --filter @gestor/database db:seed",
     "db:seed:mock": "pnpm --filter @gestor/database db:seed:mock",
     "db:rls": "pnpm --filter @gestor/database db:rls",
-    "db:studio": "pnpm --filter @gestor/database studio"
+    "db:studio": "pnpm --filter @gestor/database studio",
+    "clean": "pnpm --filter @gestor/web clean"
   },
   "devDependencies": {
     "prettier": "^3.3.3",
