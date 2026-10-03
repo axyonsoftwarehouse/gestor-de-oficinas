@@ -215,3 +215,46 @@ export interface InspectionTemplate {
   versions?: InspectionTemplateVersion[];
   _count?: { versions: number };
 }
+
+export interface BranchFull {
+  id: string;
+  name: string;
+  code?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  isActive: boolean;
+}
+
+export type MembershipStatus = 'ACTIVE' | 'INVITED' | 'DISABLED';
+
+export interface RoleRef {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface TeamMember {
+  id: string;
+  status: MembershipStatus;
+  isOwner: boolean;
+  user: { id: string; name: string; email: string; isActive: boolean };
+  branch?: { id: string; name: string } | null;
+  roles: { role: RoleRef }[];
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  isSystem: boolean;
+  permissions?: { permission: Permission }[];
+  _count?: { permissions: number; memberships: number };
+}
+
+export interface Permission {
+  id: string;
+  code: string;
+  feature: string;
+  action: string;
+}

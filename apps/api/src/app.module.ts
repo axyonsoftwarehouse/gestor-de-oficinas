@@ -21,8 +21,10 @@ import { PartsModule } from './modules/parts/parts.module';
 import { PurchasesModule } from './modules/purchases/purchases.module';
 import { QuotationsModule } from './modules/quotations/quotations.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { RolesModule } from './modules/roles/roles.module';
 import { StockModule } from './modules/stock/stock.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
+import { UsersModule } from './modules/users/users.module';
 import { VehiclesModule } from './modules/vehicles/vehicles.module';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -55,6 +57,8 @@ import { PrismaModule } from './prisma/prisma.module';
     ExpensesModule,
     PurchasesModule,
     ReportsModule,
+    UsersModule,
+    RolesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
