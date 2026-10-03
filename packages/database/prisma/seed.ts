@@ -1,5 +1,4 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 import { seedPermissions, seedTenantRoles } from './seed/permissions';
 
 const prisma = new PrismaClient();
@@ -80,10 +79,6 @@ async function seedDemoTenant(): Promise<void> {
     return;
   }
 
-  const ownerEmail = process.env.SEED_OWNER_EMAIL ?? 'owner@oficina.local';
-  const ownerPassword = process.env.SEED_OWNER_PASSWORD ?? 'password';
-  const passwordHash = await bcrypt.hash(ownerPassword, 10);
-
   const tenant = await prisma.tenant.upsert({
     where: { slug: 'oficina-demo' },
     update: {},
@@ -102,43 +97,6 @@ async function seedDemoTenant(): Promise<void> {
   });
 
   await seedTenantRoles(prisma, tenant.id);
-
-  const owner = await prisma.user.upsert({
-    where: { email: ownerEmail },
-    update: { name: 'Proprietário Demo' },
-    create: {
-      email: ownerEmail,
-      name: 'Proprietário Demo',
-      passwordHash,
-      isActive: true,
-    },
-  });
-
-  const membership = await prisma.membership.upsert({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: owner.id } },
-    update: { isOwner: true, status: 'ACTIVE' },
-    create: {
-      tenantId: tenant.id,
-      userId: owner.id,
-      branchId: branch.id,
-      isOwner: true,
-      status: 'ACTIVE',
-    },
-  });
-
-  const ownerRole = await prisma.role.findUnique({
-    where: { tenantId_slug: { tenantId: tenant.id, slug: 'owner' } },
-  });
-
-  if (ownerRole) {
-    await prisma.membershipRole.upsert({
-      where: {
-        membershipId_roleId: { membershipId: membership.id, roleId: ownerRole.id },
-      },
-      update: {},
-      create: { membershipId: membership.id, roleId: ownerRole.id },
-    });
-  }
 
   const paymentMethods = [
     ['Dinheiro', 'CASH'],
@@ -176,7 +134,7 @@ async function seedDemoTenant(): Promise<void> {
   await seedInspectionTemplate(tenant.id);
 
   console.log(
-    `Tenant demo pronto: ${tenant.slug} (owner: ${ownerEmail} / ${ownerPassword})`,
+    `Tenant demo pronto: ${tenant.slug}. Rode "pnpm db:seed:owner" para criar o owner (Better Auth).`,
   );
 }
 

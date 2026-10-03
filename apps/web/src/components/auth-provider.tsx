@@ -8,40 +8,63 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { apiFetch } from '@/lib/api';
-import { clearSession, getSession, setSession, type Session } from '@/lib/session';
+import { authClient } from '@/lib/auth-client';
+
+export interface Session {
+  user: { id: string; email: string; name: string };
+  tenant: { id: string; name: string; slug: string };
+  membershipId: string;
+  permissions: string[];
+}
 
 interface AuthContextValue {
   session: Session | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }): JSX.Element {
-  const [session, setSessionState] = useState<Session | null>(null);
+  const { data: authSession, isPending } = authClient.useSession();
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setSessionState(getSession());
-    setLoading(false);
-  }, []);
+    let active = true;
+    if (isPending) return;
+    if (!authSession) {
+      setSession(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    fetch('/api/me', { credentials: 'include' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: Session | null) => {
+        if (!active) return;
+        setSession(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSession(null);
+        setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [authSession, isPending]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const result = await apiFetch<Session>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-      skipAuth: true,
-    });
-    setSession(result);
-    setSessionState(result);
+    const { error } = await authClient.signIn.email({ email, password });
+    if (error) throw new Error(error.message ?? 'Falha no login');
   }, []);
 
-  const logout = useCallback(() => {
-    clearSession();
-    setSessionState(null);
+  const logout = useCallback(async () => {
+    await authClient.signOut();
+    setSession(null);
     if (typeof window !== 'undefined') window.location.href = '/login';
   }, []);
 

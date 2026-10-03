@@ -10,12 +10,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "echo \"(sem lint configurado)\"",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma migrate deploy",
-    "db:rls": "prisma db execute --file prisma/rls.sql --schema prisma/schema.prisma",
-    "db:seed": "pnpm --filter @gestor/shared build && tsx prisma/seed.ts",
-    "db:seed:mock": "pnpm --filter @gestor/shared build && tsx prisma/seed-mock.ts",
-    "studio": "prisma studio"
+    "db:migrate": "dotenv -e ../../.env -- prisma migrate dev",
+    "db:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
+    "db:rls": "dotenv -e ../../.env -- prisma db execute --file prisma/rls.sql --schema prisma/schema.prisma",
+    "db:seed": "pnpm --filter @gestor/shared build && dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "db:seed:mock": "pnpm --filter @gestor/shared build && dotenv -e ../../.env -- tsx prisma/seed-mock.ts",
+    "studio": "dotenv -e ../../.env -- prisma studio"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -28,6 +28,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.10.0",
     "bcryptjs": "^2.4.3",
+    "dotenv-cli": "^7.4.4",
     "prisma": "^6.1.0",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3"
