@@ -5,7 +5,7 @@
 > falta implementar. Complementa `AGENTS.md` (guia de retomada) e
 > `docs/plano-migracao-neon-vercel.md` (execução da migração).
 
-Última atualização: pós-migração para Next full stack (Vercel + Neon + Better Auth).
+Última atualização: migração concluída e **deploy ao vivo** (Vercel + Neon + Better Auth).
 
 ---
 
@@ -166,12 +166,14 @@ docs/             # documentação
 - **21** telas no web.
 - **17** módulos de domínio portados (Nest → Next).
 - **90** permissões, **5** papéis template.
+- **8** testes automatizados (Vitest: `rls`, `flows`, `auth`).
 
 ### 5.2 Qualidade já verificada
-- `typecheck` de `web` e `database` verdes.
-- `next build` verde (rotas com tipagem correta).
+- `typecheck` (monorepo) e `next build` verdes.
 - **RLS validada de ponta a ponta** no Neon: sem contexto de tenant = 0 linhas;
   com contexto = 1 linha.
+- **Suíte Vitest** verde (banco de teste dedicado) e **CI** (GitHub Actions com
+  Postgres service).
 - **Smoke tests reais no Neon** cobrindo: CRUD dos 17 módulos, criação de usuário
   via Better Auth, inspeção completa, `issueToJob` recalculando a OS, fluxo
   OS → orçamento → fatura → pagamento → documento HTML, compra → estoque →
@@ -183,21 +185,30 @@ docs/             # documentação
 - Fase 2: runtime server (`withTenant`, `runRoute`, erros, validação).
 - Fase 3: **portados os 17 módulos** de domínio.
 - Fase 4: web readaptado (cookies, `apiFetch`, provider, login, middleware).
+- Fase 5: headers de segurança.
+- Fase 6: (pendente) PDF headless e storage.
+- Fase 7: testes Vitest + CI.
+- Fase 8: **`apps/api` removido** (NestJS descomissionado).
+- **Deploy ao vivo**: Vercel (região `gru1`) + Neon, login funcionando.
+  (`turbo.json` declara as envs em `globalEnv` — sem isso o `envMode: strict`
+  do Turbo removia `BETTER_AUTH_SECRET`/URLs do build.)
 
 ---
 
 ## 6. O que falta implementar
 
 ### 6.1 Finalização da migração (técnico)
+Concluído: headers de segurança, testes Vitest + CI, config de deploy na Vercel
+(região `gru1`, build via Turbo filtrando `@gestor/web`, runbook) e
+descomissionamento do `apps/api`.
+
 | Item | Descrição | Prioridade |
 |---|---|---|
-| Headers de segurança | Configurar headers no `next.config` (substituto do helmet) | P1 |
-| Testes e2e | Portar `app`/`rls`/`flows` (hoje testam a API Nest antiga) | **P0** |
-| CI/CD | Pipeline (typecheck, build, migrate deploy) + envs na Vercel | **P0** |
 | PDF headless | Serviço de PDF consumindo `GET /invoices/:id/document` (HTML pronto) | P1 |
 | Storage | Anexos/avatares (Vercel Blob / R2 / Neon Object Storage) | P2 |
 | Backups | Dump offsite (Neon free não tem backup agendado) | **P0** |
-| Rotação de segredos | Rotacionar senha do Neon e do `app_gestor` | **P0** |
+| Rotação de segredos | Rotacionar senha do Neon e do `app_gestor` (circularam em dev) | **P0** |
+| Observabilidade | Logs/alertas e runbook de produção | P2 |
 
 ### 6.2 Lacunas funcionais (backend + UI)
 - **Catálogo de Serviços** (`ServiceCatalog`): modelo existe, mas **sem API e sem
@@ -218,18 +229,17 @@ docs/             # documentação
 - Coluna `passwordHash` legada em `users` (substituída pelo `account` do Better Auth).
 - `TENANT_MODELS` (extensão Prisma) não inclui `Purchase` (RLS já cobre; corrigir
   a defesa em profundidade).
-- Dependência de configuração de região (Neon × Vercel) para latência.
 - Observabilidade/alertas ainda não configurados.
 
 ---
 
 ## 7. Roadmap sugerido (priorizado)
 
-**Sprint 0 — Hardening (P0)**
-1. Portar testes e2e para o Next e criar `globalSetup` de limpeza.
-2. CI/CD com migrations no deploy e envs configuradas.
-3. Backups offsite + rotação de segredos.
-4. Headers de segurança.
+**Sprint 0 — Hardening (P0)** — concluído
+1. Testes Vitest (`rls`, `flows`, `auth`) + CI. ✅
+2. Headers de segurança. ✅
+3. Deploy (Vercel + Neon) ao vivo. ✅
+4. **Pendente:** backups offsite e rotação de segredos.
 
 **Sprint 1 — Fechar o produto**
 5. Catálogo de Serviços (API + tela) e uso no orçamento/OS.
@@ -295,6 +305,7 @@ BETTER_AUTH_URL=http://localhost:3000
 - **Schema**: `packages/database/prisma/schema.prisma` (65 modelos).
 - **RLS**: `packages/database/prisma/rls.sql`.
 - **Migração**: `docs/plano-migracao-neon-vercel.md`.
+- **Deploy**: `docs/deploy-vercel.md`.
 - **Regras de domínio**: `docs/especificacao-dominio.md`.
 - **Dicionário de dados**: `docs/dicionario-dados-referencias.md`.
 - **Layout/tema**: `docs/referencia-layout-fintrust.md`.

@@ -80,8 +80,10 @@ ledger + despesa automática), relatórios, usuários, papéis/permissões. `GET
 **Qualidade**: `typecheck` e `next build` verdes; **RLS validada** no Neon;
 testes Vitest (`rls`, `flows`, `auth`).
 
-**Deploy**: Vercel (região `gru1`) + Neon. Ver `docs/deploy-vercel.md` e
-`.github/workflows/{ci,migrate}.yml`.
+**Deploy**: **ao vivo** em https://gestor-de-oficinas.vercel.app (Vercel, região
+`gru1`) + Neon. Ver `docs/deploy-vercel.md` e `.github/workflows/{ci,migrate}.yml`.
+Obs.: `turbo.json` declara as envs em `globalEnv` (o `envMode: strict` do Turbo
+remove do build qualquer variável não declarada).
 
 ## Backlog / próximos passos
 1. **App mobile** do mecânico (Expo + **PowerSync**, offline-first).
