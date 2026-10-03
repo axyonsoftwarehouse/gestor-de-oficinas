@@ -9,6 +9,7 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
 import { TenantContextInterceptor } from './common/interceptors/tenant-context.interceptor';
 import { HealthModule } from './health/health.module';
 import { AppointmentsModule } from './modules/appointments/appointments.module';
+import { BranchesModule } from './modules/branches/branches.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { InspectionsModule } from './modules/inspections/inspections.module';
@@ -39,6 +40,7 @@ import { PrismaModule } from './prisma/prisma.module';
     CustomersModule,
     VehiclesModule,
     AppointmentsModule,
+    BranchesModule,
     InspectionsModule,
     JobCardsModule,
     QuotationsModule,

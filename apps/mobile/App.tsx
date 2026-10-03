@@ -2,7 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { APP_NAME } from '@gestor/shared';
 
-export default function App(): JSX.Element {
+export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
