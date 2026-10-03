@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Wrench } from 'lucide-react';
 import { useAuth } from '@/components/auth-provider';
 import { Button, Card, ErrorText, Field, Input } from '@/components/ui';
 
@@ -28,36 +29,47 @@ export default function LoginPage(): JSX.Element {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-sm p-6">
-        <h1 className="text-lg font-semibold text-slate-900">Gestor de Oficinas</h1>
-        <p className="mt-1 text-sm text-slate-500">Acesse o painel administrativo.</p>
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <Field label="E-mail">
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </Field>
-          <Field label="Senha">
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </Field>
-          <ErrorText>{error}</ErrorText>
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? 'Entrando…' : 'Entrar'}
-          </Button>
-        </form>
-        <p className="mt-4 text-xs text-slate-400">
+    <div className="flex min-h-screen items-center justify-center bg-surface-page p-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex flex-col items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand text-white">
+            <Wrench size={20} />
+          </span>
+          <div className="text-center">
+            <div className="text-lg font-semibold text-ink">Gestor de Oficinas</div>
+            <div className="text-sm text-ink-muted">Acesse o painel administrativo</div>
+          </div>
+        </div>
+
+        <Card className="p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Field label="E-mail">
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </Field>
+            <Field label="Senha">
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </Field>
+            <ErrorText>{error}</ErrorText>
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? 'Entrando…' : 'Entrar'}
+            </Button>
+          </form>
+        </Card>
+
+        <p className="mt-4 text-center text-xs text-ink-soft">
           Demo: owner@oficina.local / password
         </p>
-      </Card>
+      </div>
     </div>
   );
 }
