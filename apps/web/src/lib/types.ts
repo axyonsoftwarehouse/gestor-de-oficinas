@@ -137,3 +137,81 @@ export interface Supplier {
   id: string;
   name: string;
 }
+
+export type InspectionStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type InspectionResult =
+  | 'OK'
+  | 'ATTENTION'
+  | 'REPAIR'
+  | 'NOT_INSPECTED'
+  | 'NOT_APPLICABLE';
+export type ApprovalStatus = 'NOT_REQUIRED' | 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface InspectionOption {
+  id: string;
+  label: string;
+  value: string;
+}
+
+export interface InspectionQuestion {
+  id: string;
+  code?: string | null;
+  label: string;
+  type: string;
+  required: boolean;
+  sequence: number;
+  options: InspectionOption[];
+  section?: { id: string; title: string; sequence: number };
+}
+
+export interface InspectionAnswer {
+  id: string;
+  questionId: string;
+  value?: string | null;
+  result: InspectionResult;
+  comment?: string | null;
+  approvalStatus: ApprovalStatus;
+  question: InspectionQuestion;
+}
+
+export interface Inspection {
+  id: string;
+  status: InspectionStatus;
+  notes?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+  vehicle?: {
+    id: string;
+    plate?: string | null;
+    brand?: { name: string } | null;
+    model?: { name: string } | null;
+  } | null;
+  jobCard?: { id: string; number: string } | null;
+  answers?: InspectionAnswer[];
+  _count?: { answers: number };
+}
+
+export interface InspectionTemplateSection {
+  id: string;
+  title: string;
+  displayType: string;
+  sequence: number;
+  questions: InspectionQuestion[];
+}
+
+export interface InspectionTemplateVersion {
+  id: string;
+  version: number;
+  publishedAt?: string | null;
+  sections: InspectionTemplateSection[];
+}
+
+export interface InspectionTemplate {
+  id: string;
+  name: string;
+  description?: string | null;
+  createdAt: string;
+  versions?: InspectionTemplateVersion[];
+  _count?: { versions: number };
+}

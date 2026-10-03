@@ -11,6 +11,8 @@ const NAV = [
   { href: '/customers', label: 'Clientes' },
   { href: '/vehicles', label: 'Veículos' },
   { href: '/appointments', label: 'Agendamentos' },
+  { href: '/inspections', label: 'Inspeções' },
+  { href: '/inspection-templates', label: 'Checklists' },
   { href: '/quotations', label: 'Orçamentos' },
   { href: '/job-cards', label: 'Ordens de serviço' },
   { href: '/invoices', label: 'Faturas' },
