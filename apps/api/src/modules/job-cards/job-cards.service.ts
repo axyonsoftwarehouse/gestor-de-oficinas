@@ -173,7 +173,7 @@ export class JobCardsService {
     if (dto.status === 'DELIVERED') timestamps.deliveredAt = new Date();
     if (dto.status === 'LOCKED') timestamps.lockedAt = new Date();
 
-    return this.prisma.client.$transaction(async (tx) => {
+    return this.prisma.runInTransaction(async (tx) => {
       const updated = await tx.jobCard.update({
         where: { id },
         data: { status: dto.status, ...timestamps },

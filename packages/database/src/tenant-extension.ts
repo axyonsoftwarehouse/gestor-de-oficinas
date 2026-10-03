@@ -98,9 +98,18 @@ export const tenantExtension = Prisma.defineExtension({
   },
 });
 
+/** Usa APP_DATABASE_URL (papel de aplicação) quando definido. */
+function resolveOptions(
+  options?: Prisma.PrismaClientOptions,
+): Prisma.PrismaClientOptions {
+  const appUrl = process.env.APP_DATABASE_URL;
+  if (appUrl) return { ...(options ?? {}), datasourceUrl: appUrl };
+  return options ?? {};
+}
+
 /** Client com escopo automático de tenant (uso normal da aplicação). */
 export function createPrismaClient(options?: Prisma.PrismaClientOptions) {
-  const base = new PrismaClient(options);
+  const base = new PrismaClient(resolveOptions(options));
   return base.$extends(tenantExtension);
 }
 
@@ -108,5 +117,5 @@ export type DatabaseClient = ReturnType<typeof createPrismaClient>;
 
 /** Client sem escopo de tenant (operações de plataforma, ex.: login). */
 export function createSystemPrismaClient(options?: Prisma.PrismaClientOptions) {
-  return new PrismaClient(options);
+  return new PrismaClient(resolveOptions(options));
 }

@@ -188,7 +188,7 @@ export class QuotationsService {
       taxIds: effectiveTaxIds,
     });
 
-    const line = await this.prisma.client.$transaction(async (tx) => {
+    const line = await this.prisma.runInTransaction(async (tx) => {
       await tx.quotationLineTax.deleteMany({ where: { lineId } });
       return tx.quotationLine.update({
         where: { id: lineId },
@@ -272,7 +272,7 @@ export class QuotationsService {
       padding: 6,
     });
 
-    const invoiceId = await this.prisma.client.$transaction(async (tx) => {
+    const invoiceId = await this.prisma.runInTransaction(async (tx) => {
       const invoice = await tx.invoice.create({
         data: {
           tenantId: requireTenantId(),

@@ -4,8 +4,10 @@ import {
   Injectable,
   type NestInterceptor,
 } from '@nestjs/common';
-import { Observable } from 'rxjs';
+import { firstValueFrom, from, type Observable } from 'rxjs';
 import { runWithTenant } from '@gestor/database';
+import { PrismaService } from '../../prisma/prisma.service';
+import { prismaContext } from '../../prisma/prisma-context';
 import type { AuthUser } from '../interfaces/auth-user.interface';
 
 interface RequestWithContext {
@@ -14,13 +16,16 @@ interface RequestWithContext {
 }
 
 /**
- * Abre o contexto de tenant (AsyncLocalStorage) para a execução do handler.
+ * Abre o contexto de tenant (AsyncLocalStorage), define `app.current_tenant`
+ * na transação do PostgreSQL (habilitando o RLS) e executa o handler dentro
+ * dessa transação. Roda após os guards, então já enxerga `req.user`.
  *
- * Roda após os guards, então já enxerga `req.user` populado pelo JwtStrategy.
  * O fallback por header `x-tenant-id` serve apenas para desenvolvimento.
  */
 @Injectable()
 export class TenantContextInterceptor implements NestInterceptor {
+  constructor(private readonly prisma: PrismaService) {}
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest<RequestWithContext>();
     const user = request.user;
@@ -28,10 +33,17 @@ export class TenantContextInterceptor implements NestInterceptor {
 
     if (!tenantId) return next.handle();
 
-    return new Observable((subscriber) => {
-      runWithTenant({ tenantId, userId: user?.userId }, () => {
-        next.handle().subscribe(subscriber);
-      });
-    });
+    const run = async (): Promise<unknown> =>
+      this.prisma.base.$transaction(
+        async (tx) => {
+          await tx.$executeRaw`select set_config('app.current_tenant', ${tenantId}, true)`;
+          return runWithTenant({ tenantId, userId: user?.userId }, () =>
+            prismaContext.run(tx, () => firstValueFrom(next.handle())),
+          );
+        },
+        { timeout: 30000, maxWait: 10000 },
+      );
+
+    return from(run());
   }
 }

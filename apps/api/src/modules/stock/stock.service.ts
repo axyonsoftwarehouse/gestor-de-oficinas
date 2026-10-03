@@ -143,7 +143,7 @@ export class StockService {
   }
 
   async recordMovement(input: MovementInput) {
-    return this.prisma.client.$transaction(async (tx) => {
+    return this.prisma.runInTransaction(async (tx) => {
       const location = await tx.stockLocation.findFirst({
         where: { id: input.locationId },
       });

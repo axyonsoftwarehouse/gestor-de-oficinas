@@ -125,7 +125,7 @@ export class InvoicesService {
           ? discountValue
           : new Prisma.Decimal(0);
 
-    const invoiceId = await this.prisma.client.$transaction(async (tx) => {
+    const invoiceId = await this.prisma.runInTransaction(async (tx) => {
       const invoice = await tx.invoice.create({
         data: {
           tenantId: requireTenantId(),
@@ -181,7 +181,7 @@ export class InvoicesService {
   }
 
   async addPayment(invoiceId: string, dto: CreatePaymentDto, userId: string) {
-    return this.prisma.client.$transaction(async (tx) => {
+    return this.prisma.runInTransaction(async (tx) => {
       const invoice = await tx.invoice.findFirst({ where: { id: invoiceId } });
       if (!invoice) throw new NotFoundException('Fatura não encontrada');
       if (invoice.status === 'CANCELLED') {
@@ -218,7 +218,7 @@ export class InvoicesService {
   }
 
   async removePayment(invoiceId: string, paymentId: string) {
-    return this.prisma.client.$transaction(async (tx) => {
+    return this.prisma.runInTransaction(async (tx) => {
       const invoice = await tx.invoice.findFirst({ where: { id: invoiceId } });
       if (!invoice) throw new NotFoundException('Fatura não encontrada');
 

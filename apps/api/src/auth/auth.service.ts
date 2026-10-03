@@ -176,6 +176,9 @@ export class AuthService {
         const tenant = await tx.tenant.create({
           data: { name: dto.tenantName, slug, status: 'ACTIVE', plan: 'trial' },
         });
+        // Define o tenant corrente na transação para que a RLS permita
+        // criar os registros do novo tenant (ex.: filial).
+        await tx.$executeRaw`select set_config('app.current_tenant', ${tenant.id}, true)`;
         const branch = await tx.branch.create({
           data: { tenantId: tenant.id, name: 'Matriz', code: 'MATRIZ' },
         });

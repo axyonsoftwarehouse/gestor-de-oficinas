@@ -20,7 +20,7 @@ export class NumberSequenceService {
     const prefix = options.prefix ?? '';
     const padding = options.padding ?? 6;
 
-    const sequence = await this.prisma.client.$transaction((tx) =>
+    const sequence = await this.prisma.runInTransaction((tx) =>
       tx.numberSequence.upsert({
         where: { tenantId_entity: { tenantId, entity } },
         create: { tenantId, entity, prefix, padding, nextValue: 2 },
