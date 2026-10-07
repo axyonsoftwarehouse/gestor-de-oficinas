@@ -81,7 +81,8 @@ ledger + despesa automática), relatórios, usuários, papéis/permissões. `GET
 testes Vitest (`rls`, `flows`, `auth`).
 
 **Deploy**: **ao vivo** em https://gestor-de-oficinas.vercel.app (Vercel, região
-`gru1`) + Neon. Ver `docs/deploy-vercel.md` e `.github/workflows/{ci,migrate}.yml`.
+`gru1`) + Neon. Repositório em https://github.com/axyonsoftwarehouse/gestor-de-oficinas
+(Vercel conectada a ele). Ver `docs/deploy-vercel.md` e `.github/workflows/{ci,migrate}.yml`.
 Obs.: `turbo.json` declara as envs em `globalEnv` (o `envMode: strict` do Turbo
 remove do build qualquer variável não declarada).
 
