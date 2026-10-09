@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import { useServices } from '@/lib/queries';
 import type { JobCard, JobStatus, Paginated, TeamMember } from '@/lib/types';
 import { formatMoney } from '@/lib/format';
 import {
@@ -43,6 +44,7 @@ export default function JobCardDetailPage(): JSX.Element {
   const [error, setError] = useState('');
   const [line, setLine] = useState({
     type: 'LABOR',
+    serviceId: '',
     description: '',
     quantity: '1',
     unitPrice: '',
@@ -53,6 +55,22 @@ export default function JobCardDetailPage(): JSX.Element {
     queryKey: ['users', 'options'],
     queryFn: () => apiFetch<Paginated<TeamMember>>('/users?pageSize=100'),
   });
+  const services = useServices();
+
+  function applyService(value: string): void {
+    if (!value) {
+      setLine((p) => ({ ...p, serviceId: '' }));
+      return;
+    }
+    const service = services.data?.items.find((item) => item.id === value);
+    setLine((p) => ({
+      ...p,
+      serviceId: value,
+      type: service ? 'SERVICE' : p.type,
+      description: service?.name ?? p.description,
+      unitPrice: service ? String(service.basePrice) : p.unitPrice,
+    }));
+  }
 
   const job = useQuery({
     queryKey: ['job-card', id],
@@ -81,6 +99,7 @@ export default function JobCardDetailPage(): JSX.Element {
         method: 'POST',
         body: JSON.stringify({
           type: line.type,
+          serviceId: line.serviceId || undefined,
           description: line.description || undefined,
           quantity: Number(line.quantity) || 1,
           unitPrice: Number(line.unitPrice) || 0,
@@ -89,7 +108,7 @@ export default function JobCardDetailPage(): JSX.Element {
     },
     onSuccess: () => {
       invalidate();
-      setLine({ type: 'LABOR', description: '', quantity: '1', unitPrice: '' });
+      setLine({ type: 'LABOR', serviceId: '', description: '', quantity: '1', unitPrice: '' });
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Erro'),
   });
@@ -183,6 +202,21 @@ export default function JobCardDetailPage(): JSX.Element {
 
           <div className="mt-4 border-t border-slate-100 pt-4">
             <ErrorText>{error}</ErrorText>
+            <div className="mb-3 max-w-sm">
+              <Field label="Serviço do catálogo (opcional)">
+                <Select
+                  value={line.serviceId}
+                  onChange={(e) => applyService(e.target.value)}
+                >
+                  <option value="">Nenhum (item livre)</option>
+                  {services.data?.items.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
               <Field label="Tipo">
                 <Select
