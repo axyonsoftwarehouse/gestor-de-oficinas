@@ -65,6 +65,7 @@ export interface JobCard {
   taxTotal: string | number;
   createdAt: string;
   lines?: JobLine[];
+  mechanics?: JobMechanic[];
   statusHistory?: { id: string; toStatus: JobStatus; changedAt: string }[];
 }
 
@@ -136,6 +137,45 @@ export interface Purchase {
 export interface Supplier {
   id: string;
   name: string;
+  document?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  notes?: string | null;
+  isActive?: boolean;
+}
+
+export interface Expense {
+  id: string;
+  branchId: string;
+  jobCardId?: string | null;
+  category: string;
+  description?: string | null;
+  amount: string | number;
+  expenseDate: string;
+  jobCard?: { id: string; number: string } | null;
+}
+
+export interface ExpenseList extends Paginated<Expense> {
+  sum: string | number;
+}
+
+export interface StockMovement {
+  id: string;
+  type: string;
+  quantity: string | number;
+  unitCost?: string | number | null;
+  refType?: string | null;
+  refId?: string | null;
+  createdAt: string;
+  part?: { id: string; name: string; sku?: string | null } | null;
+  location?: { id: string; name: string } | null;
+}
+
+export interface JobMechanic {
+  userId: string;
+  role?: string | null;
+  hours?: string | number | null;
+  user?: { id: string; name: string } | null;
 }
 
 export type InspectionStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';

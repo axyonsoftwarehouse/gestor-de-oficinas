@@ -17,8 +17,10 @@ import {
   Search,
   Shield,
   ShoppingCart,
+  Truck,
   UserCog,
   Users,
+  Wallet,
   Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -44,6 +46,8 @@ const NAV = [
   { href: '/parts', label: 'Peças', icon: Package },
   { href: '/stock', label: 'Estoque', icon: Boxes },
   { href: '/purchases', label: 'Compras', icon: ShoppingCart },
+  { href: '/suppliers', label: 'Fornecedores', icon: Truck },
+  { href: '/expenses', label: 'Despesas', icon: Wallet },
 ];
 
 function initials(name: string): string {
