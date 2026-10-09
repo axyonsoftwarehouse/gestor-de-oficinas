@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch, buildQuery } from './api';
-import type { Customer, Paginated, Vehicle } from './types';
+import type { Customer, Paginated, ServiceItem, Vehicle } from './types';
 
 export interface Branch {
   id: string;
@@ -33,6 +33,16 @@ export function useVehicles(customerId?: string) {
     queryFn: () =>
       apiFetch<Paginated<Vehicle>>(
         `/vehicles${buildQuery({ customerId, pageSize: 100 })}`,
+      ),
+  });
+}
+
+export function useServices(search?: string) {
+  return useQuery({
+    queryKey: ['services', 'options', search ?? ''],
+    queryFn: () =>
+      apiFetch<Paginated<ServiceItem>>(
+        `/services${buildQuery({ search, pageSize: 100 })}`,
       ),
   });
 }

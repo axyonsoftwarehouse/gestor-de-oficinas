@@ -102,6 +102,16 @@ export interface Invoice {
   payments?: { id: string; amount: string | number; paidAt: string; reference?: string | null }[];
 }
 
+export interface ServiceItem {
+  id: string;
+  code?: string | null;
+  name: string;
+  description?: string | null;
+  basePrice: string | number;
+  standardTime?: string | number | null;
+  isActive: boolean;
+}
+
 export interface Part {
   id: string;
   name: string;

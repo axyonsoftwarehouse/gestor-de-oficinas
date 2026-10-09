@@ -13,6 +13,7 @@ import { createPart } from '../src/server/services/parts.service';
 import { cancelPurchase, createPurchase } from '../src/server/services/purchases.service';
 import * as quotations from '../src/server/services/quotations.service';
 import { createRole } from '../src/server/services/roles.service';
+import * as catalog from '../src/server/services/services.service';
 import * as stock from '../src/server/services/stock.service';
 import { createUser } from '../src/server/services/users.service';
 import { createVehicle } from '../src/server/services/vehicles.service';
@@ -278,6 +279,47 @@ describe('Regressões de backend', () => {
     await expect(
       parseBody(jsonRequest('POST', { phone: '11999999999' }), CreateCustomerDto),
     ).rejects.toThrow();
+  });
+
+  it('catálogo de serviços: cria, lista, atualiza e remove (soft delete)', async () => {
+    const t = await createTestTenant();
+
+    const created = await t.run(() =>
+      catalog.createService({ name: 'Alinhamento', code: 'SRV-1', basePrice: 120 }),
+    );
+    expect(Number(created.basePrice)).toBe(120);
+
+    const listed = await t.run(() => catalog.listServices({ search: 'Alinha' }));
+    expect(listed.items.some((item) => item.id === created.id)).toBe(true);
+
+    const updated = await t.run(() =>
+      catalog.updateService(created.id, { basePrice: 150 }),
+    );
+    expect(Number(updated.basePrice)).toBe(150);
+
+    await t.run(() => catalog.removeService(created.id));
+    await expect(t.run(() => catalog.findService(created.id))).rejects.toThrow();
+  });
+
+  it('lança item de OS vinculado a um serviço do catálogo', async () => {
+    const t = await createTestTenant();
+    const { job } = await createJob(t);
+    const service = await t.run(() =>
+      catalog.createService({ name: 'Troca de óleo', basePrice: 80 }),
+    );
+
+    await t.run(() =>
+      jobCards.addJobLine(job.id, {
+        type: 'SERVICE',
+        serviceId: service.id,
+        description: service.name,
+        quantity: 1,
+        unitPrice: Number(service.basePrice),
+      }),
+    );
+
+    const detail = await t.run(() => jobCards.findJobCard(job.id));
+    expect(detail.lines?.[0]?.description).toBe('Troca de óleo');
   });
 
   it('não permite alterar itens de orçamento aprovado', async () => {
