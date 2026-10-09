@@ -15,8 +15,10 @@ export function GET(req: NextRequest): Promise<Response> {
 }
 
 export function POST(req: NextRequest): Promise<Response> {
-  return runRoute({ permissions: ['role.create'] }, req, async (request) => {
+  return runRoute({ permissions: ['role.create'] }, req, async (request, session) => {
     const dto = await parseBody(request, CreateRoleDto);
-    return NextResponse.json(await createRole(dto), { status: 201 });
+    return NextResponse.json(await createRole(dto, session.permissions), {
+      status: 201,
+    });
   });
 }

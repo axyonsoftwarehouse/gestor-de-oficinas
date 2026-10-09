@@ -1350,6 +1350,7 @@ model Expense {
   tenantId    String    @db.Uuid @map("tenant_id")
   branchId    String    @db.Uuid
   jobCardId   String?   @db.Uuid
+  purchaseId  String?   @db.Uuid @map("purchase_id")
   category    String
   description String?
   amount      Decimal   @db.Decimal(14, 2)
@@ -1357,9 +1358,11 @@ model Expense {
   createdById String?   @db.Uuid
   createdAt   DateTime  @default(now())
 
-  branch  Branch   @relation(fields: [branchId], references: [id])
-  jobCard JobCard? @relation(fields: [jobCardId], references: [id])
+  branch   Branch    @relation(fields: [branchId], references: [id])
+  jobCard  JobCard?  @relation(fields: [jobCardId], references: [id])
+  purchase Purchase? @relation(fields: [purchaseId], references: [id])
 
+  @@unique([purchaseId])
   @@index([tenantId])
   @@index([branchId, expenseDate])
   @@map("expenses")
@@ -1536,6 +1539,7 @@ model Purchase {
   location StockLocation  @relation(fields: [locationId], references: [id])
   supplier Supplier?      @relation(fields: [supplierId], references: [id])
   items    PurchaseItem[]
+  expense  Expense?
 
   @@unique([tenantId, number])
   @@index([tenantId])
@@ -1544,13 +1548,14 @@ model Purchase {
 }
 
 model PurchaseItem {
-  id          String  @id @default(uuid()) @db.Uuid
-  purchaseId  String  @db.Uuid
-  partId      String  @db.Uuid
-  description String?
-  quantity    Decimal @db.Decimal(14, 3)
-  unitCost    Decimal @db.Decimal(14, 2)
-  total       Decimal @db.Decimal(14, 2)
+  id           String   @id @default(uuid()) @db.Uuid
+  purchaseId   String   @db.Uuid
+  partId       String   @db.Uuid
+  description  String?
+  quantity     Decimal  @db.Decimal(14, 3)
+  unitCost     Decimal  @db.Decimal(14, 2)
+  previousCost Decimal? @db.Decimal(14, 2) @map("previous_cost")
+  total        Decimal  @db.Decimal(14, 2)
 
   purchase Purchase    @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   part     PartCatalog @relation(fields: [partId], references: [id])

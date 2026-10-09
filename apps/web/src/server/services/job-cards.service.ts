@@ -11,6 +11,7 @@ import type { UpdateJobCardDto } from '../dtos/update-job-card.dto';
 import type { UpdateJobLineDto } from '../dtos/update-job-line.dto';
 import { calculateLine } from './line-calculator.service';
 import { nextNumber } from './number-sequence.service';
+import { assertCustomerRef, assertLineRefs, assertVehicleRef } from './references.service';
 
 const ALLOWED_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
   DRAFT: ['SCHEDULED', 'CHECKED_IN', 'CANCELLED'],
@@ -51,6 +52,9 @@ const detailInclude = {
 } satisfies Prisma.JobCardInclude;
 
 export async function createJobCard(dto: CreateJobCardDto, userId: string) {
+  await assertCustomerRef(dto.customerId);
+  await assertVehicleRef(dto.vehicleId);
+
   const number = await nextNumber('job_card', { prefix: 'JC-', padding: 6 });
 
   return getDb().jobCard.create({
@@ -182,7 +186,12 @@ export async function transitionJobCard(
 }
 
 export async function addJobLine(jobCardId: string, dto: CreateJobLineDto) {
-  await assertJob(jobCardId);
+  assertJobEditable(await assertJob(jobCardId));
+  await assertLineRefs({
+    serviceId: dto.serviceId,
+    partId: dto.partId,
+    unitId: dto.unitId,
+  });
 
   const amounts = await calculateLine({
     quantity: dto.quantity ?? 1,
@@ -227,6 +236,12 @@ export async function updateJobLine(
     include: { taxes: true },
   });
   if (!existing) throw new NotFoundError('Item da OS não encontrado');
+  assertJobEditable(await assertJob(jobCardId));
+  await assertLineRefs({
+    serviceId: dto.serviceId,
+    partId: dto.partId,
+    unitId: dto.unitId,
+  });
 
   const effectiveTaxIds = dto.taxIds ?? existing.taxes.map((tax) => tax.taxId);
   const amounts = await calculateLine({
@@ -271,6 +286,7 @@ export async function removeJobLine(
     select: { id: true },
   });
   if (!existing) throw new NotFoundError('Item da OS não encontrado');
+  assertJobEditable(await assertJob(jobCardId));
 
   await getDb().jobLine.delete({ where: { id: lineId } });
   await recalcTotals(jobCardId);
@@ -278,7 +294,7 @@ export async function removeJobLine(
 }
 
 export async function assignMechanic(jobCardId: string, dto: AssignMechanicDto) {
-  await assertJob(jobCardId);
+  assertJobEditable(await assertJob(jobCardId));
   return getDb().jobMechanic.upsert({
     where: { jobCardId_userId: { jobCardId, userId: dto.userId } },
     create: { jobCardId, userId: dto.userId, role: dto.role, hours: dto.hours },
@@ -290,6 +306,7 @@ export async function removeMechanic(
   jobCardId: string,
   userId: string,
 ): Promise<{ success: true }> {
+  assertJobEditable(await assertJob(jobCardId));
   await getDb().jobMechanic.deleteMany({ where: { jobCardId, userId } });
   return { success: true };
 }
@@ -302,11 +319,20 @@ async function assertJob(id: string) {
   return job;
 }
 
+/** Status em que a OS não pode mais sofrer alterações de itens/mecânicos. */
+const FINAL_STATUSES: JobStatus[] = ['CANCELLED', 'DELIVERED', 'LOCKED'];
+
+function assertJobEditable(job: { status: JobStatus }): void {
+  if (FINAL_STATUSES.includes(job.status)) {
+    throw new BadRequestError(`OS em ${job.status} não pode ser alterada`);
+  }
+}
+
 async function recalcTotals(jobCardId: string): Promise<void> {
   const [lines, job] = await Promise.all([
     getDb().jobLine.findMany({
       where: { jobCardId },
-      select: { total: true, taxAmount: true },
+      select: { taxBase: true, taxAmount: true },
     }),
     getDb().jobCard.findUnique({
       where: { id: jobCardId },
@@ -315,7 +341,7 @@ async function recalcTotals(jobCardId: string): Promise<void> {
   ]);
 
   const subtotal = lines.reduce(
-    (sum, line) => sum.plus(line.total),
+    (sum, line) => sum.plus(line.taxBase),
     new Prisma.Decimal(0),
   );
   const taxTotal = lines.reduce(

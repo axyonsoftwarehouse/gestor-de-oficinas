@@ -25,4 +25,14 @@ export const auth = betterAuth({
   advanced: {
     database: { generateId: false },
   },
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 100,
+    customRules: {
+      '/sign-in/email': { window: 60, max: 10 },
+      '/sign-up/email': { window: 60, max: 10 },
+      '/forget-password': { window: 60, max: 5 },
+    },
+  },
 });

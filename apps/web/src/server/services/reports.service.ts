@@ -13,6 +13,7 @@ export async function financialReport(query: QueryReportDto) {
   if (range) invoiceWhere.issueDate = range;
 
   const paymentWhere: Prisma.PaymentWhereInput = {};
+  if (query.branchId) paymentWhere.invoice = { branchId: query.branchId };
   if (range) paymentWhere.paidAt = range;
 
   const expenseWhere: Prisma.ExpenseWhereInput = {};

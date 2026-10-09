@@ -12,6 +12,7 @@ import type { QueryQuotationDto } from '../dtos/query-quotation.dto';
 import type { UpdateQuotationDto } from '../dtos/update-quotation.dto';
 import { calculateLine } from './line-calculator.service';
 import { nextNumber } from './number-sequence.service';
+import { assertLineRefs } from './references.service';
 
 const detailInclude = {
   customer: { select: { id: true, name: true } },
@@ -125,7 +126,12 @@ export async function updateQuotation(id: string, dto: UpdateQuotationDto) {
 }
 
 export async function addQuotationLine(quotationId: string, dto: CreateLineItemDto) {
-  await assertQuotation(quotationId);
+  assertQuotationEditable(await assertQuotation(quotationId));
+  await assertLineRefs({
+    serviceId: dto.serviceId,
+    partId: dto.partId,
+    unitId: dto.unitId,
+  });
 
   const amounts = await calculateLine({
     quantity: dto.quantity ?? 1,
@@ -165,11 +171,17 @@ export async function updateQuotationLine(
   lineId: string,
   dto: UpdateLineItemDto,
 ) {
+  assertQuotationEditable(await assertQuotation(quotationId));
   const existing = await getDb().quotationLine.findFirst({
     where: { id: lineId, quotationId },
     include: { taxes: true },
   });
   if (!existing) throw new NotFoundError('Item do orçamento não encontrado');
+  await assertLineRefs({
+    serviceId: dto.serviceId,
+    partId: dto.partId,
+    unitId: dto.unitId,
+  });
 
   const effectiveTaxIds = dto.taxIds ?? existing.taxes.map((tax) => tax.taxId);
   const amounts = await calculateLine({
@@ -209,6 +221,7 @@ export async function removeQuotationLine(
   quotationId: string,
   lineId: string,
 ): Promise<{ success: true }> {
+  assertQuotationEditable(await assertQuotation(quotationId));
   const existing = await getDb().quotationLine.findFirst({
     where: { id: lineId, quotationId },
     select: { id: true },
@@ -341,6 +354,21 @@ async function assertQuotation(id: string) {
   const quotation = await getDb().quotation.findFirst({ where: { id } });
   if (!quotation) throw new NotFoundError('Orçamento não encontrado');
   return quotation;
+}
+
+/** Orçamentos nestes estados não aceitam mais alteração de itens. */
+const LOCKED_QUOTATION_STATUSES: QuotationStatus[] = [
+  'APPROVED',
+  'REJECTED',
+  'CONVERTED',
+];
+
+function assertQuotationEditable(quotation: { status: QuotationStatus }): void {
+  if (LOCKED_QUOTATION_STATUSES.includes(quotation.status)) {
+    throw new BadRequestError(
+      `Orçamento em ${quotation.status} não pode ter itens alterados`,
+    );
+  }
 }
 
 async function recalcQuotationTotals(quotationId: string): Promise<void> {

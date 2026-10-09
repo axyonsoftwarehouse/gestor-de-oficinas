@@ -43,6 +43,12 @@ export async function createPurchase(dto: CreatePurchaseDto, userId: string) {
   });
 
   for (const item of itemRows) {
+    const part = await getDb().partCatalog.findFirst({
+      where: { id: item.partId },
+      select: { costPrice: true },
+    });
+    if (!part) throw new BadRequestError('Peça inválida');
+
     await getDb().purchaseItem.create({
       data: {
         purchaseId: purchase.id,
@@ -50,6 +56,7 @@ export async function createPurchase(dto: CreatePurchaseDto, userId: string) {
         description: item.description,
         quantity: new Prisma.Decimal(item.quantity),
         unitCost: new Prisma.Decimal(item.unitCost),
+        previousCost: part.costPrice,
         total: item.total,
       },
     });
@@ -76,6 +83,7 @@ export async function createPurchase(dto: CreatePurchaseDto, userId: string) {
       data: {
         tenantId,
         branchId: dto.branchId,
+        purchaseId: purchase.id,
         category: 'Compras',
         description: `Compra ${number}`,
         amount: subtotal,
@@ -144,7 +152,16 @@ export async function cancelPurchase(id: string) {
       refType: 'purchase_cancel',
       refId: purchase.id,
     });
+
+    if (item.previousCost !== null) {
+      await getDb().partCatalog.update({
+        where: { id: item.partId },
+        data: { costPrice: item.previousCost },
+      });
+    }
   }
+
+  await getDb().expense.deleteMany({ where: { purchaseId: purchase.id } });
 
   await getDb().purchase.update({
     where: { id },

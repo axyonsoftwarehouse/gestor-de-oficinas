@@ -1,5 +1,6 @@
 import { DiscountType, Prisma } from '@prisma/client';
 import { getDb } from '../db/prisma';
+import { BadRequestError } from '../http/errors';
 
 export interface LineAmountInput {
   quantity: number;
@@ -16,6 +17,9 @@ export async function calculateLine(input: LineAmountInput) {
   const gross = quantity.mul(unitPrice);
 
   const discountValue = new Prisma.Decimal(input.discountValue);
+  if (input.discountType === 'PERCENT' && discountValue.gt(100)) {
+    throw new BadRequestError('Desconto percentual não pode exceder 100%');
+  }
   const discount =
     input.discountType === 'PERCENT'
       ? gross.mul(discountValue).div(100)
@@ -24,6 +28,9 @@ export async function calculateLine(input: LineAmountInput) {
         : new Prisma.Decimal(0);
 
   const base = gross.minus(discount);
+  if (base.lt(0)) {
+    throw new BadRequestError('Desconto não pode ser maior que o valor da linha');
+  }
 
   const taxes = input.taxIds?.length
     ? await getDb().tax.findMany({

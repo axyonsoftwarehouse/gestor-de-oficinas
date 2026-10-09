@@ -2,6 +2,7 @@ import 'server-only';
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate, type ValidationError } from 'class-validator';
+import { isPartialDto } from '../dtos/partial-type';
 import { BadRequestError } from './errors';
 
 type Class<T> = new () => T;
@@ -28,6 +29,7 @@ async function validateDto<T extends object>(
   const errors = await validate(instance, {
     whitelist: true,
     forbidNonWhitelisted: true,
+    skipMissingProperties: isPartialDto(dto),
   });
   if (errors.length > 0) {
     throw new BadRequestError(flatten(errors).join('; '));

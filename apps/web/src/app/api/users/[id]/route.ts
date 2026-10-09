@@ -21,10 +21,12 @@ export function GET(req: NextRequest, ctx: Ctx): Promise<Response> {
 }
 
 export function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
-  return runRoute({ permissions: ['user.edit'] }, req, async (request) => {
+  return runRoute({ permissions: ['user.edit'] }, req, async (request, session) => {
     const { id } = await ctx.params;
     const dto = await parseBody(request, UpdateUserDto);
-    return NextResponse.json(await updateUser(assertUuid(id), dto));
+    return NextResponse.json(
+      await updateUser(assertUuid(id), dto, session.permissions),
+    );
   });
 }
 

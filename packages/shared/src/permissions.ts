@@ -84,3 +84,18 @@ export function matchesPermissionPattern(code: string, patterns: readonly string
     return code === pattern;
   });
 }
+
+/**
+ * Verifica se `granted` cobre todas as permissões em `required`.
+ * `'*'` concede tudo. Usado para impedir que alguém conceda permissões
+ * que não possui (defesa contra escalação de privilégio).
+ */
+export function hasAllPermissions(
+  granted: readonly string[],
+  required: readonly string[],
+): boolean {
+  if (required.length === 0) return true;
+  if (granted.includes('*')) return true;
+  const grantedSet = new Set(granted);
+  return required.every((permission) => grantedSet.has(permission));
+}

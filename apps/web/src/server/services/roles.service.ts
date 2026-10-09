@@ -1,6 +1,7 @@
+import { hasAllPermissions } from '@gestor/shared';
 import { requireTenantId } from '@gestor/database';
 import { getDb, system } from '../db/prisma';
-import { BadRequestError, NotFoundError } from '../http/errors';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../http/errors';
 import type { CreateRoleDto } from '../dtos/create-role.dto';
 import type { UpdateRoleDto } from '../dtos/update-role.dto';
 
@@ -27,9 +28,14 @@ export function listPermissions() {
   });
 }
 
-export async function createRole(dto: CreateRoleDto) {
+export async function createRole(dto: CreateRoleDto, actorPermissions: string[]) {
   const tenantId = requireTenantId();
   const slug = await uniqueSlug(tenantId, dto.name);
+
+  const permissions = await resolveGrantablePermissions(
+    dto.permissionCodes,
+    actorPermissions,
+  );
 
   const role = await getDb().role.create({
     data: {
@@ -41,11 +47,7 @@ export async function createRole(dto: CreateRoleDto) {
     },
   });
 
-  if (dto.permissionCodes && dto.permissionCodes.length > 0) {
-    const permissions = await getDb().permission.findMany({
-      where: { code: { in: dto.permissionCodes } },
-      select: { id: true },
-    });
+  if (permissions.length > 0) {
     await getDb().rolePermission.createMany({
       data: permissions.map((permission) => ({
         roleId: role.id,
@@ -58,21 +60,31 @@ export async function createRole(dto: CreateRoleDto) {
   return findRole(role.id);
 }
 
-export async function updateRole(id: string, dto: UpdateRoleDto) {
-  await findRole(id);
+export async function updateRole(
+  id: string,
+  dto: UpdateRoleDto,
+  actorPermissions: string[],
+) {
+  const role = await findRole(id);
+
+  if (dto.permissionCodes && role.slug === 'owner') {
+    throw new ForbiddenError(
+      'As permissões do papel Proprietário não podem ser alteradas',
+    );
+  }
+
+  const permissions = dto.permissionCodes
+    ? await resolveGrantablePermissions(dto.permissionCodes, actorPermissions)
+    : null;
 
   await getDb().role.update({
     where: { id },
     data: { name: dto.name, description: dto.description },
   });
 
-  if (dto.permissionCodes) {
+  if (permissions) {
     await getDb().rolePermission.deleteMany({ where: { roleId: id } });
-    if (dto.permissionCodes.length > 0) {
-      const permissions = await getDb().permission.findMany({
-        where: { code: { in: dto.permissionCodes } },
-        select: { id: true },
-      });
+    if (permissions.length > 0) {
       await getDb().rolePermission.createMany({
         data: permissions.map((permission) => ({
           roleId: id,
@@ -84,6 +96,25 @@ export async function updateRole(id: string, dto: UpdateRoleDto) {
   }
 
   return findRole(id);
+}
+
+/** Resolve códigos de permissão e garante que o ator os possui. */
+async function resolveGrantablePermissions(
+  codes: string[] | undefined,
+  actorPermissions: string[],
+): Promise<{ id: string }[]> {
+  if (!codes || codes.length === 0) return [];
+
+  const permissions = await getDb().permission.findMany({
+    where: { code: { in: codes } },
+    select: { id: true, code: true },
+  });
+
+  if (!hasAllPermissions(actorPermissions, permissions.map((p) => p.code))) {
+    throw new ForbiddenError('Você não pode conceder permissões que não possui');
+  }
+
+  return permissions;
 }
 
 export async function removeRole(id: string): Promise<{ success: true }> {

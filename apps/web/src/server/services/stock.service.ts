@@ -1,13 +1,14 @@
 import { Prisma, StockMovementType } from '@prisma/client';
 import { requireTenantId } from '@gestor/database';
 import { getDb } from '../db/prisma';
-import { NotFoundError } from '../http/errors';
+import { BadRequestError, NotFoundError } from '../http/errors';
 import type { CreateLocationDto } from '../dtos/create-location.dto';
 import type { CreateMovementDto } from '../dtos/create-movement.dto';
 import type { IssueToJobDto } from '../dtos/issue-to-job.dto';
 import type { QueryBalanceDto } from '../dtos/query-balance.dto';
 import type { QueryMovementDto } from '../dtos/query-movement.dto';
 import { addJobLine } from './job-cards.service';
+import { assertPartRef } from './references.service';
 
 const INBOUND: StockMovementType[] = ['INITIAL', 'PURCHASE', 'RETURN_IN'];
 
@@ -141,7 +142,22 @@ export async function recordMovement(input: MovementInput) {
   });
   if (!location) throw new NotFoundError('Local de estoque não encontrado');
 
+  await assertPartRef(input.partId);
+
   const tenantId = requireTenantId();
+
+  const currentBalance = await getDb().stockBalance.findUnique({
+    where: {
+      locationId_partId: { locationId: input.locationId, partId: input.partId },
+    },
+    select: { quantity: true },
+  });
+  const resulting = (currentBalance?.quantity ?? new Prisma.Decimal(0)).plus(
+    input.quantity,
+  );
+  if (resulting.lt(0)) {
+    throw new BadRequestError('Saldo de estoque insuficiente para esta operação');
+  }
 
   const movement = await getDb().stockMovement.create({
     data: {

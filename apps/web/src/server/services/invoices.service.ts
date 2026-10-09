@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { requireTenantId } from '@gestor/database';
 import { getDb } from '../db/prisma';
-import { BadRequestError, NotFoundError } from '../http/errors';
+import { BadRequestError, ConflictError, NotFoundError } from '../http/errors';
 import type { CreatePaymentDto } from '../dtos/create-payment.dto';
 import type { QueryInvoiceDto } from '../dtos/query-invoice.dto';
 import type { UpdateInvoiceDto } from '../dtos/update-invoice.dto';
@@ -97,9 +97,18 @@ export async function cancelInvoice(id: string) {
 export async function createInvoiceFromJobCard(jobCardId: string, userId: string) {
   const job = await getDb().jobCard.findFirst({
     where: { id: jobCardId, deletedAt: null },
-    include: { lines: { include: { taxes: true } } },
+    include: {
+      lines: { include: { taxes: true } },
+      invoices: { where: { deletedAt: null }, select: { id: true } },
+    },
   });
   if (!job) throw new NotFoundError('OS não encontrada');
+  if (job.status === 'CANCELLED') {
+    throw new BadRequestError('OS cancelada não pode ser faturada');
+  }
+  if (job.invoices.length > 0) {
+    throw new ConflictError('OS já possui fatura');
+  }
 
   const number = await nextNumber('invoice', { prefix: 'FT-', padding: 6 });
 
@@ -171,6 +180,16 @@ export async function addInvoicePayment(
   if (!invoice) throw new NotFoundError('Fatura não encontrada');
   if (invoice.status === 'CANCELLED') {
     throw new BadRequestError('Fatura cancelada');
+  }
+
+  const paidAggregate = await getDb().payment.aggregate({
+    where: { invoiceId },
+    _sum: { amount: true },
+  });
+  const alreadyPaid = paidAggregate._sum.amount ?? new Prisma.Decimal(0);
+  const remaining = invoice.total.minus(alreadyPaid);
+  if (new Prisma.Decimal(dto.amount).gt(remaining)) {
+    throw new BadRequestError('Valor excede o saldo em aberto da fatura');
   }
 
   await getDb().payment.create({

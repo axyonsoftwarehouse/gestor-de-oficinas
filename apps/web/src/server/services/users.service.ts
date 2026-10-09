@@ -1,9 +1,11 @@
+import { hasAllPermissions } from '@gestor/shared';
 import { Prisma, requireTenantId } from '@gestor/database';
 import { auth } from '../auth/auth';
 import { getDb, system } from '../db/prisma';
 import {
   BadRequestError,
   ConflictError,
+  ForbiddenError,
   NotFoundError,
 } from '../http/errors';
 import type { CreateUserDto } from '../dtos/create-user.dto';
@@ -54,11 +56,11 @@ export async function findUser(id: string) {
   return membership;
 }
 
-export async function createUser(dto: CreateUserDto) {
+export async function createUser(dto: CreateUserDto, actorPermissions: string[]) {
   const existing = await system.user.findUnique({ where: { email: dto.email } });
   if (existing) throw new ConflictError('E-mail já cadastrado');
 
-  await validateRoles(dto.roleIds ?? []);
+  await validateRoles(dto.roleIds ?? [], actorPermissions);
 
   const signUp = await auth.api.signUpEmail({
     body: { email: dto.email, password: dto.password, name: dto.name },
@@ -87,9 +89,13 @@ export async function createUser(dto: CreateUserDto) {
   }
 }
 
-export async function updateUser(id: string, dto: UpdateUserDto) {
+export async function updateUser(
+  id: string,
+  dto: UpdateUserDto,
+  actorPermissions: string[],
+) {
   const membership = await findUser(id);
-  if (dto.roleIds) await validateRoles(dto.roleIds);
+  if (dto.roleIds) await validateRoles(dto.roleIds, actorPermissions);
   if (membership.isOwner && dto.status === 'DISABLED') {
     throw new BadRequestError('O proprietário não pode ser desativado');
   }
@@ -129,13 +135,32 @@ export async function removeUser(id: string): Promise<{ success: true }> {
   return { success: true };
 }
 
-async function validateRoles(roleIds: string[]): Promise<void> {
+async function validateRoles(
+  roleIds: string[],
+  actorPermissions: string[],
+): Promise<void> {
   if (roleIds.length === 0) return;
   const roles = await getDb().role.findMany({
     where: { id: { in: roleIds }, tenantId: requireTenantId() },
-    select: { id: true },
+    select: {
+      id: true,
+      permissions: { select: { permission: { select: { code: true } } } },
+    },
   });
   if (roles.length !== roleIds.length) {
     throw new BadRequestError('Papel inválido');
+  }
+
+  const grantedCodes = Array.from(
+    new Set(
+      roles.flatMap((role) =>
+        role.permissions.map((rolePermission) => rolePermission.permission.code),
+      ),
+    ),
+  );
+  if (!hasAllPermissions(actorPermissions, grantedCodes)) {
+    throw new ForbiddenError(
+      'Você não pode atribuir um papel com permissões que não possui',
+    );
   }
 }
