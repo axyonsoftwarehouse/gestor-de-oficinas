@@ -37,11 +37,22 @@ pnpm --filter @gestor/web dev                 # Web/API -> http://localhost:3000
 ```
 Login demo: **owner@oficina.local / password**
 
-Testes (Vitest no web; exigem um **banco de teste dedicado**):
+Testes (Vitest no web; exigem um **banco de teste dedicado**). Há um
+**PostgreSQL portable** (sem Docker, sem admin, sem serviço) baixado para
+`.pgtest/` e controlado por `scripts/pg-test.ps1`:
 ```
-# preencha TEST_DATABASE_URL / TEST_DIRECT_URL / TEST_APP_DATABASE_URL no .env
-pnpm --filter @gestor/web test
+pnpm db:test:up                 # baixa (1x), inicializa e sobe o Postgres na porta 5434
+# .env (o papel app_gestor/RLS é criado automaticamente pelo setup dos testes):
+# TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5434/gestor_test"
+# TEST_DIRECT_URL="postgresql://postgres:postgres@localhost:5434/gestor_test"
+# TEST_APP_DATABASE_URL="postgresql://app_gestor:app_gestor@localhost:5434/gestor_test"
+
+pnpm --filter @gestor/web test  # o setup aplica migrations, app-role, RLS e limpa as tabelas antes/depois
+pnpm db:test:down               # para o banco (nada fica rodando em background)
 ```
+Outros comandos: `db:test:status`, `db:test:reset` (recria o cluster),
+`db:test:destroy` (apaga binários e dados). Na CI o Postgres é provido como
+service (`.github/workflows/ci.yml`).
 Tipos: `pnpm typecheck`. Build: `pnpm --filter @gestor/web build`.
 
 ## Arquitetura e convenções (importante)

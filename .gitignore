@@ -35,6 +35,9 @@ coverage/
 # Prisma
 packages/database/prisma/migrations/dev.db*
 
+# PostgreSQL portable de teste (scripts/pg-test.ps1)
+.pgtest/
+
 # Editor / OS
 .DS_Store
 .idea/
