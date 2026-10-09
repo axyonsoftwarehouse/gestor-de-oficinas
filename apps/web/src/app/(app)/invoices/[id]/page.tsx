@@ -62,6 +62,12 @@ export default function InvoiceDetailPage(): JSX.Element {
     onError: (err) => setError(err instanceof Error ? err.message : 'Erro'),
   });
 
+  const cancel = useMutation({
+    mutationFn: () => apiFetch(`/invoices/${id}/cancel`, { method: 'POST' }),
+    onSuccess: invalidate,
+    onError: (err) => setError(err instanceof Error ? err.message : 'Erro'),
+  });
+
   async function openDocument(): Promise<void> {
     try {
       const html = await apiFetchText(`/invoices/${id}/document`);
@@ -89,6 +95,19 @@ export default function InvoiceDetailPage(): JSX.Element {
             <Button variant="secondary" onClick={openDocument}>
               Documento
             </Button>
+            {data.status !== 'PAID' && data.status !== 'CANCELLED' ? (
+              <Button
+                variant="danger"
+                disabled={cancel.isPending}
+                onClick={() => {
+                  if (window.confirm(`Cancelar a fatura ${data.number}?`)) {
+                    cancel.mutate();
+                  }
+                }}
+              >
+                Cancelar
+              </Button>
+            ) : null}
           </div>
         }
       />

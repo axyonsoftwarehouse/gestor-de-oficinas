@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { apiFetch } from '@/lib/api';
-import type { JobCard, JobStatus } from '@/lib/types';
+import type { JobCard, JobStatus, Paginated, TeamMember } from '@/lib/types';
 import { formatMoney } from '@/lib/format';
 import {
   Badge,
@@ -46,6 +46,12 @@ export default function JobCardDetailPage(): JSX.Element {
     description: '',
     quantity: '1',
     unitPrice: '',
+  });
+  const [mechanic, setMechanic] = useState({ userId: '', role: '', hours: '' });
+
+  const team = useQuery({
+    queryKey: ['users', 'options'],
+    queryFn: () => apiFetch<Paginated<TeamMember>>('/users?pageSize=100'),
   });
 
   const job = useQuery({
@@ -91,6 +97,30 @@ export default function JobCardDetailPage(): JSX.Element {
   const removeLine = useMutation({
     mutationFn: (lineId: string) =>
       apiFetch(`/job-cards/${id}/lines/${lineId}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
+    onError: (err) => setError(err instanceof Error ? err.message : 'Erro'),
+  });
+
+  const assignMechanic = useMutation({
+    mutationFn: () =>
+      apiFetch(`/job-cards/${id}/mechanics`, {
+        method: 'POST',
+        body: JSON.stringify({
+          userId: mechanic.userId,
+          role: mechanic.role || undefined,
+          hours: mechanic.hours ? Number(mechanic.hours) : undefined,
+        }),
+      }),
+    onSuccess: () => {
+      invalidate();
+      setMechanic({ userId: '', role: '', hours: '' });
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'Erro'),
+  });
+
+  const removeMechanic = useMutation({
+    mutationFn: (userId: string) =>
+      apiFetch(`/job-cards/${id}/mechanics/${userId}`, { method: 'DELETE' }),
     onSuccess: invalidate,
     onError: (err) => setError(err instanceof Error ? err.message : 'Erro'),
   });
@@ -214,6 +244,63 @@ export default function JobCardDetailPage(): JSX.Element {
                 </Button>
               ))
             )}
+          </div>
+
+          <h3 className="mt-6 text-sm font-semibold text-slate-800">Mecânicos</h3>
+          <ul className="mt-2 space-y-1 text-xs text-slate-500">
+            {data.mechanics?.length ? (
+              data.mechanics.map((item) => (
+                <li key={item.userId} className="flex items-center justify-between gap-2">
+                  <span>
+                    {item.user?.name ?? item.userId}
+                    {item.role ? ` · ${item.role}` : ''}
+                  </span>
+                  <button
+                    type="button"
+                    className="text-slate-400 hover:text-red-600"
+                    onClick={() => removeMechanic.mutate(item.userId)}
+                  >
+                    remover
+                  </button>
+                </li>
+              ))
+            ) : (
+              <li>Nenhum mecânico atribuído.</li>
+            )}
+          </ul>
+          <div className="mt-3 space-y-2">
+            <Select
+              value={mechanic.userId}
+              onChange={(e) => setMechanic((p) => ({ ...p, userId: e.target.value }))}
+            >
+              <option value="">Selecione o membro…</option>
+              {team.data?.items.map((member) => (
+                <option key={member.user.id} value={member.user.id}>
+                  {member.user.name}
+                </option>
+              ))}
+            </Select>
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                placeholder="Função"
+                value={mechanic.role}
+                onChange={(e) => setMechanic((p) => ({ ...p, role: e.target.value }))}
+              />
+              <Input
+                type="number"
+                placeholder="Horas"
+                value={mechanic.hours}
+                onChange={(e) => setMechanic((p) => ({ ...p, hours: e.target.value }))}
+              />
+            </div>
+            <Button
+              variant="secondary"
+              className="w-full"
+              disabled={!mechanic.userId || assignMechanic.isPending}
+              onClick={() => assignMechanic.mutate()}
+            >
+              Atribuir
+            </Button>
           </div>
 
           <h3 className="mt-6 text-sm font-semibold text-slate-800">Histórico</h3>

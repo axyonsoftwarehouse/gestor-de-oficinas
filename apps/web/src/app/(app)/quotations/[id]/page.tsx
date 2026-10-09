@@ -12,7 +12,10 @@ import {
   Card,
   EmptyState,
   ErrorText,
+  Field,
+  Input,
   PageHeader,
+  Select,
   Spinner,
   Td,
   Th,
@@ -24,6 +27,12 @@ export default function QuotationDetailPage(): JSX.Element {
   const router = useRouter();
   const qc = useQueryClient();
   const [error, setError] = useState('');
+  const [line, setLine] = useState({
+    type: 'LABOR',
+    description: '',
+    quantity: '1',
+    unitPrice: '',
+  });
 
   const quotation = useQuery({
     queryKey: ['quotation', id],
@@ -46,11 +55,43 @@ export default function QuotationDetailPage(): JSX.Element {
     onError: (err) => setError(err instanceof Error ? err.message : 'Erro'),
   });
 
+  const invalidate = (): void => {
+    qc.invalidateQueries({ queryKey: ['quotation', id] });
+    qc.invalidateQueries({ queryKey: ['quotations'] });
+  };
+
+  const addLine = useMutation({
+    mutationFn: async () => {
+      await apiFetch(`/quotations/${id}/lines`, {
+        method: 'POST',
+        body: JSON.stringify({
+          type: line.type,
+          description: line.description || undefined,
+          quantity: Number(line.quantity) || 1,
+          unitPrice: Number(line.unitPrice) || 0,
+        }),
+      });
+    },
+    onSuccess: () => {
+      invalidate();
+      setLine({ type: 'LABOR', description: '', quantity: '1', unitPrice: '' });
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'Erro'),
+  });
+
+  const removeLine = useMutation({
+    mutationFn: (lineId: string) =>
+      apiFetch(`/quotations/${id}/lines/${lineId}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
+    onError: (err) => setError(err instanceof Error ? err.message : 'Erro'),
+  });
+
   if (quotation.isLoading) return <Spinner />;
   if (!quotation.data) return <EmptyState message="Orçamento não encontrado." />;
 
   const data = quotation.data;
   const canApprove = data.status === 'DRAFT' || data.status === 'SENT';
+  const editable = data.status === 'DRAFT' || data.status === 'SENT';
 
   return (
     <div>
@@ -73,15 +114,23 @@ export default function QuotationDetailPage(): JSX.Element {
                   <Th>Descrição</Th>
                   <Th className="text-right">Qtd</Th>
                   <Th className="text-right">Total</Th>
+                  {editable ? <Th /> : null}
                 </tr>
               </thead>
               <tbody>
-                {data.lines.map((line) => (
-                  <tr key={line.id} className="border-b border-slate-100">
-                    <Td>{line.type}</Td>
-                    <Td>{line.description ?? '-'}</Td>
-                    <Td className="text-right">{String(line.quantity)}</Td>
-                    <Td className="text-right">{formatMoney(line.total)}</Td>
+                {data.lines.map((item) => (
+                  <tr key={item.id} className="border-b border-slate-100">
+                    <Td>{item.type}</Td>
+                    <Td>{item.description ?? '-'}</Td>
+                    <Td className="text-right">{String(item.quantity)}</Td>
+                    <Td className="text-right">{formatMoney(item.total)}</Td>
+                    {editable ? (
+                      <Td className="text-right">
+                        <Button variant="ghost" onClick={() => removeLine.mutate(item.id)}>
+                          Remover
+                        </Button>
+                      </Td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -90,6 +139,52 @@ export default function QuotationDetailPage(): JSX.Element {
           <div className="mt-3 text-right text-sm text-slate-700">
             Total: <strong>{formatMoney(data.total)}</strong>
           </div>
+
+          {editable ? (
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <ErrorText>{error}</ErrorText>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                <Field label="Tipo">
+                  <Select
+                    value={line.type}
+                    onChange={(e) => setLine((p) => ({ ...p, type: e.target.value }))}
+                  >
+                    <option value="LABOR">Mão de obra</option>
+                    <option value="PART">Peça</option>
+                    <option value="SERVICE">Serviço</option>
+                    <option value="CUSTOM">Outro</option>
+                  </Select>
+                </Field>
+                <div className="md:col-span-2">
+                  <Field label="Descrição">
+                    <Input
+                      value={line.description}
+                      onChange={(e) => setLine((p) => ({ ...p, description: e.target.value }))}
+                    />
+                  </Field>
+                </div>
+                <Field label="Qtd">
+                  <Input
+                    type="number"
+                    value={line.quantity}
+                    onChange={(e) => setLine((p) => ({ ...p, quantity: e.target.value }))}
+                  />
+                </Field>
+                <Field label="Unitário">
+                  <Input
+                    type="number"
+                    value={line.unitPrice}
+                    onChange={(e) => setLine((p) => ({ ...p, unitPrice: e.target.value }))}
+                  />
+                </Field>
+              </div>
+              <div className="mt-3">
+                <Button onClick={() => addLine.mutate()} disabled={addLine.isPending}>
+                  Adicionar item
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </Card>
 
         <Card className="p-4">

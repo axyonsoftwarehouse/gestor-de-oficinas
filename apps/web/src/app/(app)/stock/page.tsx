@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { apiFetch, buildQuery } from '@/lib/api';
-import type { Paginated, Part, StockBalance, StockLocation } from '@/lib/types';
+import type { JobCard, Paginated, Part, StockBalance, StockLocation } from '@/lib/types';
 import { useBranches } from '@/lib/queries';
 import { formatNumber } from '@/lib/format';
 import {
@@ -32,6 +32,13 @@ export default function StockPage(): JSX.Element {
     quantity: '',
     unitCost: '',
   });
+  const [issue, setIssue] = useState({
+    locationId: '',
+    partId: '',
+    quantity: '',
+    jobCardId: '',
+    addToJob: true,
+  });
 
   const locations = useQuery({
     queryKey: ['stock-locations'],
@@ -44,6 +51,11 @@ export default function StockPage(): JSX.Element {
   const parts = useQuery({
     queryKey: ['parts', 'options'],
     queryFn: () => apiFetch<Paginated<Part>>(`/parts${buildQuery({ pageSize: 100 })}`),
+  });
+  const jobCards = useQuery({
+    queryKey: ['job-cards', 'options'],
+    queryFn: () =>
+      apiFetch<Paginated<JobCard>>(`/job-cards${buildQuery({ pageSize: 100 })}`),
   });
 
   const createLocation = useMutation({
@@ -74,6 +86,25 @@ export default function StockPage(): JSX.Element {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['stock-balances'] });
       setMovement({ locationId: '', partId: '', type: 'PURCHASE', quantity: '', unitCost: '' });
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'Erro'),
+  });
+
+  const issueToJob = useMutation({
+    mutationFn: () =>
+      apiFetch('/stock/issues', {
+        method: 'POST',
+        body: JSON.stringify({
+          locationId: issue.locationId,
+          partId: issue.partId,
+          quantity: Number(issue.quantity),
+          jobCardId: issue.jobCardId,
+          addToJob: issue.addToJob,
+        }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['stock-balances'] });
+      setIssue({ locationId: '', partId: '', quantity: '', jobCardId: '', addToJob: true });
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Erro'),
   });
@@ -153,6 +184,62 @@ export default function StockPage(): JSX.Element {
                 className="w-full"
               >
                 Registrar
+              </Button>
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <h2 className="text-sm font-semibold text-slate-800">Baixar para OS</h2>
+            <div className="mt-3 space-y-3">
+              <Field label="Local">
+                <Select value={issue.locationId} onChange={(e) => setIssue((p) => ({ ...p, locationId: e.target.value }))}>
+                  <option value="">Selecione…</option>
+                  {locations.data?.map((location) => (
+                    <option key={location.id} value={location.id}>{location.name}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Peça">
+                <Select value={issue.partId} onChange={(e) => setIssue((p) => ({ ...p, partId: e.target.value }))}>
+                  <option value="">Selecione…</option>
+                  {parts.data?.items.map((part) => (
+                    <option key={part.id} value={part.id}>{part.name}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="OS">
+                <Select value={issue.jobCardId} onChange={(e) => setIssue((p) => ({ ...p, jobCardId: e.target.value }))}>
+                  <option value="">Selecione…</option>
+                  {jobCards.data?.items.map((job) => (
+                    <option key={job.id} value={job.id}>
+                      {job.number} · {job.customer?.name ?? ''}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Quantidade">
+                <Input type="number" value={issue.quantity} onChange={(e) => setIssue((p) => ({ ...p, quantity: e.target.value }))} />
+              </Field>
+              <label className="flex items-center gap-2 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={issue.addToJob}
+                  onChange={(e) => setIssue((p) => ({ ...p, addToJob: e.target.checked }))}
+                />
+                Adicionar a peça como item da OS
+              </label>
+              <Button
+                onClick={() => issueToJob.mutate()}
+                disabled={
+                  issueToJob.isPending ||
+                  !issue.locationId ||
+                  !issue.partId ||
+                  !issue.quantity ||
+                  !issue.jobCardId
+                }
+                className="w-full"
+              >
+                Dar baixa
               </Button>
             </div>
           </Card>

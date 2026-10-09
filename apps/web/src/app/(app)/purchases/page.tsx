@@ -88,6 +88,15 @@ export default function PurchasesPage(): JSX.Element {
     onError: (err) => setError(err instanceof Error ? err.message : 'Erro'),
   });
 
+  const cancel = useMutation({
+    mutationFn: (id: string) => apiFetch(`/purchases/${id}/cancel`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['purchases'] });
+      qc.invalidateQueries({ queryKey: ['stock-balances'] });
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'Erro ao cancelar'),
+  });
+
   function openCreate(): void {
     setError('');
     setForm({
@@ -115,6 +124,7 @@ export default function PurchasesPage(): JSX.Element {
       />
 
       <Card className="p-4">
+        <ErrorText>{error}</ErrorText>
         {isLoading ? (
           <Spinner />
         ) : !data || data.items.length === 0 ? (
@@ -128,6 +138,7 @@ export default function PurchasesPage(): JSX.Element {
                 <Th>Fornecedor</Th>
                 <Th>Status</Th>
                 <Th className="text-right">Total</Th>
+                <Th />
               </tr>
             </thead>
             <tbody>
@@ -136,8 +147,23 @@ export default function PurchasesPage(): JSX.Element {
                   <Td>{purchase.number}</Td>
                   <Td>{formatDate(purchase.purchaseDate)}</Td>
                   <Td>{purchase.supplier?.name ?? '-'}</Td>
-                  <Td><Badge>{purchase.status}</Badge></Td>
+                  <Td><Badge tone={purchase.status === 'CANCELLED' ? 'red' : 'green'}>{purchase.status}</Badge></Td>
                   <Td className="text-right">{formatMoney(purchase.total)}</Td>
+                  <Td className="text-right">
+                    {purchase.status !== 'CANCELLED' ? (
+                      <Button
+                        variant="danger"
+                        disabled={cancel.isPending}
+                        onClick={() => {
+                          if (window.confirm(`Cancelar a compra ${purchase.number}?`)) {
+                            cancel.mutate(purchase.id);
+                          }
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                    ) : null}
+                  </Td>
                 </tr>
               ))}
             </tbody>
