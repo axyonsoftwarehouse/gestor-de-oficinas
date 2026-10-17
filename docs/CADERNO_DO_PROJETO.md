@@ -17,7 +17,7 @@ Este documento registra decisões, regras aprendidas, problemas duradouros e pr�
 
 ## 2. Estado em uma tela
 
-Em 09/10/2026, painel web e API estão publicados na Vercel com banco Neon. O núcleo operacional está implementado: cadastros, agenda, inspeções, OS, orçamentos, faturas, pagamentos, estoque, compras, despesas, relatórios, usuários e papéis. O catálogo de serviços e as ações operacionais que faltavam nas telas foram concluídos em 08/10/2026. RLS, fluxos de negócio, autenticação, typecheck e build têm verificação automatizada. O aplicativo mobile ainda é um esqueleto. Anexos, notas, campos customizados, PDF headless, billing, onboarding, notificações e observabilidade ainda não foram implementados. Backups offsite e rotação de segredos permanecem prioridades operacionais. Estado técnico detalhado: [funcionalidades](mapa/03-funcionalidades.md) §3 e [problemas](mapa/06-problemas-e-dividas.md) §6.
+Em 09/10/2026, painel web e API estão publicados na Vercel com banco Neon. O núcleo operacional está implementado: cadastros, agenda, inspeções, OS, orçamentos, faturas, pagamentos, estoque, compras, despesas, relatórios, usuários e papéis. O catálogo de serviços e as ações operacionais que faltavam nas telas foram concluídos em 08/10/2026. RLS, fluxos de negócio, autenticação, typecheck e build têm verificação automatizada. O aplicativo mobile ainda é um esqueleto. Anexos, notas, campos customizados, PDF headless, billing, onboarding, notificações e observabilidade ainda não foram implementados. Backups offsite e rotação de segredos permanecem prioridades operacionais; a automação e o runbook foram preparados em 17/10/2026, mas o risco só fecha após configurar bucket/secrets, executar o primeiro backup e o drill de restauração. Estado técnico detalhado: [funcionalidades](mapa/03-funcionalidades.md) §3 e [problemas](mapa/06-problemas-e-dividas.md) §6.
 
 ## 3. Decisões fechadas
 
@@ -93,8 +93,8 @@ Em 09/10/2026, painel web e API estão publicados na Vercel com banco Neon. O n�
 | 03/10/2026 | Duas APIs concorrentes | Migração de NestJS para Route Handlers incompleta | Remover a API NestJS e consolidar no Next.js | resolvido |
 | 08/10/2026 | Teste local dependia de infraestrutura externa | Não havia PostgreSQL local simples/isolado | PostgreSQL portátil controlado por script | resolvido |
 | 08/10/2026 | Catálogo de serviços existia só no modelo | API e interface faltavam | API, tela e integração com OS/orçamento | resolvido |
-| 09/10/2026 | Neon gratuito sem backup agendado | Limitação do plano | Definir e automatizar dump offsite | aberto, P0 |
-| 09/10/2026 | Segredos de desenvolvimento precisam de rotação | Credenciais circularam durante configuração | Rotacionar Neon e papel de aplicação | aberto, P0 |
+| 09/10/2026 | Neon gratuito sem backup agendado | Limitação do plano | Definir e automatizar dump offsite | aberto, P0; workflow e runbook preparados em 17/10, falta configurar bucket/secrets e fazer o drill |
+| 09/10/2026 | Segredos de desenvolvimento precisam de rotação | Credenciais circularam durante configuração | Rotacionar Neon e papel de aplicação | aberto, P0; gerador e procedimento preparados em 17/10, falta executar |
 | 09/10/2026 | Rate limit não é global no serverless | Estado em memória por instância | Escolher armazenamento compartilhado | aberto |
 | 09/10/2026 | Credenciais demo visíveis | Conveniência de desenvolvimento | Remover/condicionar antes do uso comercial | aberto |
 | 09/10/2026 | Defesa Prisma depende de lista manual | Registro de modelos multi-tenant não é derivado do schema | Automatizar/verificar lista; manter RLS como garantia | aberto |
@@ -113,7 +113,7 @@ Em 09/10/2026, painel web e API estão publicados na Vercel com banco Neon. O n�
 
 ## 7. Próximos passos
 
-1. **Backups offsite e rotação de segredos.** Reduzir primeiro o risco operacional; exige decidir frequência, retenção e responsável.
+1. **Backups offsite e rotação de segredos.** Automação (dump cifrado diário) e runbook prontos em `docs/backups-e-rotacao.md`; falta escolher/configurar o bucket, gravar os secrets, rodar o primeiro backup, fazer o drill de restauração e rotacionar as credenciais.
 2. **Observabilidade, alertas e runbook de incidentes.** Necessário antes de ampliar clientes; depende de ferramenta e política de logs.
 3. **Anexos e notas.** Fechar lacuna operacional; depende de storage e retenção.
 4. **Serviço de PDF headless.** Transformar o HTML existente em A4/recibo; depende da infraestrutura escolhida.
@@ -138,7 +138,7 @@ Em 09/10/2026, painel web e API estão publicados na Vercel com banco Neon. O n�
 
 | Desde | Pergunta | O que falta para decidir | Quem decide |
 |---|---|---|---|
-| 09/10/2026 | Qual solução, frequência e retenção do backup offsite? | Custo, RPO/RTO e local de armazenamento | Werner/produto |
+| 09/10/2026 | Qual provedor de bucket, retenção final e responsável pela chave de backup? | Custo, RPO/RTO, local de armazenamento e escrow da chave | Werner/produto |
 | 09/10/2026 | A rotação das credenciais do Neon e do papel da aplicação já ocorreu? | Confirmação operacional e data | Werner/operação |
 | 09/10/2026 | Qual provedor e política de retenção para anexos, fotos e laudos? | Volume, custo, LGPD e expurgo | Werner/produto |
 | 09/10/2026 | Qual modelo comercial, planos, limites e provedor de billing? | Estratégia de preço e cobrança | Werner/produto |
@@ -150,3 +150,4 @@ Em 09/10/2026, painel web e API estão publicados na Vercel com banco Neon. O n�
 |---|---|
 | 09/10/2026 | Criação inicial a partir do histórico Git, documentação existente e estado do projeto no commit `83ac90f`. |
 | 17/10/2026 | Revisão de links, citações por seção e contagens do mapa antes do commit; sem alteração de código. |
+| 17/10/2026 | Automação de backup cifrado (workflow diário, scripts de dump/restauração) e procedimento de rotação de segredos; risco segue aberto até configurar bucket/secrets e concluir o drill. |

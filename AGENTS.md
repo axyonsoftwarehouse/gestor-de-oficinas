@@ -55,6 +55,16 @@ Outros comandos: `db:test:status`, `db:test:reset` (recria o cluster),
 service (`.github/workflows/ci.yml`).
 Tipos: `pnpm typecheck`. Build: `pnpm --filter @gestor/web build`.
 
+Backup offsite (o Neon free não tem backup agendado): `scripts/backup-db.mjs` +
+`.github/workflows/backup.yml`; configuração, restauração e rotação de segredos
+em `docs/backups-e-rotacao.md`.
+
+```
+pnpm db:backup                                  # dump cifrado em .backups/ (lê .env)
+pnpm db:backup:verify .backups/arquivo.dump.enc # checksum + TOC do dump
+pnpm db:restore .backups/arquivo.dump.enc --target "postgresql://..." --yes
+```
+
 ## Arquitetura e convenções (importante)
 - **Multi-tenant**: `tenant_id` em toda tabela de negócio. Isolamento real via
   **RLS** no Postgres; o runtime conecta com o papel **não-superusuário**
@@ -106,7 +116,9 @@ remove do build qualquer variável não declarada).
 5. **SaaS**: billing/planos, onboarding self-service, limites por plano.
 6. **Notificações** (e-mail/SMS) e lembretes de manutenção (agendados).
 7. **Impressão** de laudo/anexos e etiquetas QR/barcode.
-8. **Backups offsite** (Neon free não tem backup agendado) e rotação de segredos.
+8. **Backups offsite e rotação de segredos**: automação e runbook preparados;
+   falta configurar bucket/secrets, rodar o primeiro backup e o drill de
+   restauração (`docs/backups-e-rotacao.md`).
 9. Observabilidade/alertas e runbook de produção.
 
 ## Decisões de arquitetura (fechadas)
@@ -120,6 +132,7 @@ normalizado; PDF via serviço headless; monorepo pnpm+Turborepo.
 - `docs/escopo-projeto-e-roadmap.md` — escopo (negócio + técnico) e roadmap.
 - `docs/plano-migracao-neon-vercel.md` — execução da migração.
 - `docs/deploy-vercel.md` — runbook de deploy.
+- `docs/backups-e-rotacao.md` — backup offsite, restauração e rotação de segredos.
 - `docs/especificacao-dominio.md` — regras de domínio.
 - `docs/dicionario-dados-referencias.md` — dicionário de entidades.
 - `docs/analise-projetos-referencia.md` — análise dos sistemas inspiradores.

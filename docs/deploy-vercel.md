@@ -56,11 +56,13 @@ As funções rodam em **`gru1` (São Paulo)** — próxima do Neon `sa-east-1`
 - Login com o owner provisionado.
 
 ## 8. Observações
-- **Backups**: o Neon free não tem backup agendado. Configure dump offsite (R2,
-  Storage Box da Hetzner, etc.) — é o único ponto de "perda de qualidade" se
-  não tratado.
+- **Backups**: o Neon free não tem backup agendado. Rode o workflow
+  `.github/workflows/backup.yml` e siga o runbook
+  [`docs/backups-e-rotacao.md`](backups-e-rotacao.md). A configuração do bucket e
+  dos secrets ainda é uma pendência operacional.
 - **Segredos**: rotacione a senha do Neon e a do papel `app_gestor` antes de
-  produção (elas circularam em desenvolvimento).
+  produção. O procedimento e o gerador estão em
+  [`docs/backups-e-rotacao.md`](backups-e-rotacao.md) §7.
 - **Storage** (anexos/avatares): a definir (Vercel Blob / R2 / Neon Object Storage).
 - **PDF**: o endpoint `GET /api/invoices/:id/document` já devolve HTML; o serviço
   de PDF headless (Playwright) consome esse HTML fora da Vercel (backlog).
