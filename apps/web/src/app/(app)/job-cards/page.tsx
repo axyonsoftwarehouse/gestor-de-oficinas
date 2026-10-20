@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { apiFetch } from '@/lib/api';
 import type { JobCard } from '@/lib/types';
@@ -87,6 +87,17 @@ export default function JobCardsPage(): JSX.Element {
     });
     setOpen(true);
   }
+
+  // `/job-cards?new=1` (ex.: botão "Nova OS" do Dashboard) já abre o formulário.
+  const openedFromLink = useRef(false);
+  useEffect(() => {
+    if (openedFromLink.current || branches.isLoading) return;
+    if (new URLSearchParams(window.location.search).has('new')) {
+      openedFromLink.current = true;
+      openCreate();
+      router.replace('/job-cards');
+    }
+  }, [branches.isLoading]);
 
   const canSave = Boolean(form.branchId && form.customerId && form.vehicleId) && !create.isPending;
 
