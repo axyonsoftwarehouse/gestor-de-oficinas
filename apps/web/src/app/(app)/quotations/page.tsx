@@ -1,26 +1,28 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { apiFetch, buildQuery } from '@/lib/api';
-import type { JobCard, Paginated, Quotation } from '@/lib/types';
 import { formatMoney } from '@/lib/format';
+import { QUOTATION_STATUS, enumOptions } from '@/lib/labels';
+import { hasPermission } from '@/lib/permissions';
 import { useBranches, useCustomers } from '@/lib/queries';
+import type { JobCard, Paginated, Quotation } from '@/lib/types';
+import { useAuth } from '@/components/auth-provider';
+import { useConfirm } from '@/components/confirm';
+import { DataTable, usePagedQuery, type Column } from '@/components/data-table';
 import {
-  Badge,
   Button,
   Card,
-  EmptyState,
   ErrorText,
   Field,
   Input,
   Modal,
   PageHeader,
   Select,
-  Spinner,
-  Td,
-  Th,
+  StatusBadge,
 } from '@/components/ui';
 
 interface QuotationForm {
@@ -32,12 +34,36 @@ interface QuotationForm {
   copyFromJobCard: boolean;
 }
 
+const COLUMNS: Column<Quotation>[] = [
+  {
+    key: 'number',
+    header: 'Número',
+    cell: (quotation) => <span className="font-medium">{quotation.number}</span>,
+  },
+  { key: 'customer', header: 'Cliente', cell: (quotation) => quotation.customer?.name ?? '-' },
+  { key: 'job', header: 'OS', cell: (quotation) => quotation.jobCard?.number ?? '-' },
+  {
+    key: 'status',
+    header: 'Status',
+    cell: (quotation) => <StatusBadge map={QUOTATION_STATUS} value={quotation.status} />,
+  },
+  {
+    key: 'total',
+    header: 'Total',
+    align: 'right',
+    cell: (quotation) => formatMoney(quotation.total),
+  },
+];
+
 export default function QuotationsPage(): JSX.Element {
   const qc = useQueryClient();
+  const router = useRouter();
+  const confirm = useConfirm();
+  const { session } = useAuth();
+  const granted = session?.permissions ?? [];
   const branches = useBranches();
   const customers = useCustomers();
   const [status, setStatus] = useState('');
-
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState<QuotationForm>({
@@ -49,22 +75,19 @@ export default function QuotationsPage(): JSX.Element {
     copyFromJobCard: false,
   });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['quotations', status],
-    queryFn: () =>
-      apiFetch<Paginated<Quotation>>(`/quotations${buildQuery({ status, pageSize: 50 })}`),
+  const { query, page, setPage } = usePagedQuery<Quotation>('quotations', '/quotations', {
+    status,
   });
 
   const jobCards = useQuery({
     queryKey: ['job-cards', 'options'],
-    queryFn: () =>
-      apiFetch<Paginated<JobCard>>(`/job-cards${buildQuery({ pageSize: 100 })}`),
+    queryFn: () => apiFetch<Paginated<JobCard>>(`/job-cards${buildQuery({ pageSize: 100 })}`),
     enabled: open,
   });
 
   const create = useMutation({
-    mutationFn: async () => {
-      await apiFetch('/quotations', {
+    mutationFn: () =>
+      apiFetch<Quotation>('/quotations', {
         method: 'POST',
         body: JSON.stringify({
           branchId: form.branchId,
@@ -74,13 +97,23 @@ export default function QuotationsPage(): JSX.Element {
           notes: form.notes || undefined,
           copyFromJobCard: form.copyFromJobCard,
         }),
-      });
-    },
-    onSuccess: () => {
+      }),
+    onSuccess: (quotation) => {
       qc.invalidateQueries({ queryKey: ['quotations'] });
       setOpen(false);
+      toast.success(`Orçamento ${quotation.number} criado`);
+      router.push(`/quotations/${quotation.id}`);
     },
-    onError: (err) => setError(err instanceof Error ? err.message : 'Erro'),
+    onError: (err) => setError(err instanceof Error ? err.message : 'Erro ao salvar'),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => apiFetch(`/quotations/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['quotations'] });
+      toast.success('Orçamento excluído');
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Erro ao excluir'),
   });
 
   function openCreate(): void {
@@ -96,64 +129,72 @@ export default function QuotationsPage(): JSX.Element {
     setOpen(true);
   }
 
+  async function confirmRemove(quotation: Quotation): Promise<void> {
+    const ok = await confirm({
+      title: 'Excluir orçamento',
+      description: `O orçamento ${quotation.number} (rascunho) será excluído definitivamente.`,
+      confirmLabel: 'Excluir',
+      tone: 'danger',
+    });
+    if (ok) remove.mutate(quotation.id);
+  }
+
   function set<K extends keyof QuotationForm>(key: K, value: QuotationForm[K]): void {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
+
+  const canCreate = hasPermission(granted, 'quotation.create');
+  const canDelete = hasPermission(granted, 'quotation.delete');
+  const canSave = Boolean(form.branchId && form.customerId) && !create.isPending;
+  const openDetail = (quotation: Quotation) => router.push(`/quotations/${quotation.id}`);
 
   return (
     <div>
       <PageHeader
         title="Orçamentos"
         subtitle="Propostas comerciais"
-        actions={<Button onClick={openCreate}>Novo orçamento</Button>}
+        actions={canCreate ? <Button onClick={openCreate}>Novo orçamento</Button> : null}
       />
 
       <Card className="p-4">
-        <div className="mb-3 max-w-xs">
-          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+        <div className="mb-3 w-full sm:max-w-xs">
+          <Select
+            aria-label="Filtrar por status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
             <option value="">Todos os status</option>
-            <option value="DRAFT">Rascunho</option>
-            <option value="SENT">Enviado</option>
-            <option value="APPROVED">Aprovado</option>
-            <option value="REJECTED">Rejeitado</option>
-            <option value="CONVERTED">Faturado</option>
+            {enumOptions(QUOTATION_STATUS).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </Select>
         </div>
 
-        {isLoading ? (
-          <Spinner />
-        ) : !data || data.items.length === 0 ? (
-          <EmptyState message="Nenhum orçamento encontrado." />
-        ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <Th>Número</Th>
-                <Th>Cliente</Th>
-                <Th>OS</Th>
-                <Th>Status</Th>
-                <Th className="text-right">Total</Th>
-                <Th />
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((quotation) => (
-                <tr key={quotation.id} className="border-b border-slate-100">
-                  <Td>{quotation.number}</Td>
-                  <Td>{quotation.customer?.name ?? '-'}</Td>
-                  <Td>{quotation.jobCard?.number ?? '-'}</Td>
-                  <Td><Badge>{quotation.status}</Badge></Td>
-                  <Td className="text-right">{formatMoney(quotation.total)}</Td>
-                  <Td className="text-right">
-                    <Link href={`/quotations/${quotation.id}`} className="text-sm underline">
-                      Abrir
-                    </Link>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <DataTable
+          query={query}
+          columns={COLUMNS}
+          rowKey={(quotation) => quotation.id}
+          page={page}
+          onPageChange={setPage}
+          onRowClick={openDetail}
+          rowActions={(quotation) => [
+            { label: 'Abrir', onSelect: () => openDetail(quotation) },
+            {
+              label: 'Excluir',
+              onSelect: () => void confirmRemove(quotation),
+              danger: true,
+              hidden: !canDelete || quotation.status !== 'DRAFT',
+            },
+          ]}
+          emptyMessage={status ? 'Nenhum orçamento com esse status.' : 'Nenhum orçamento ainda.'}
+          emptyAction={
+            !status && canCreate ? (
+              <Button onClick={openCreate}>Criar o primeiro orçamento</Button>
+            ) : undefined
+          }
+        />
       </Card>
 
       <Modal
@@ -165,54 +206,81 @@ export default function QuotationsPage(): JSX.Element {
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button
-              onClick={() => create.mutate()}
-              disabled={create.isPending || !form.branchId || !form.customerId}
-            >
+            <Button type="submit" form="quotation-form" disabled={!canSave}>
               {create.isPending ? 'Salvando…' : 'Criar orçamento'}
             </Button>
           </>
         }
       >
-        <ErrorText>{error}</ErrorText>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Filial">
-            <Select value={form.branchId} onChange={(e) => set('branchId', e.target.value)}>
-              <option value="">Selecione…</option>
-              {branches.data?.map((branch) => (
-                <option key={branch.id} value={branch.id}>{branch.name}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Cliente">
-            <Select value={form.customerId} onChange={(e) => set('customerId', e.target.value)}>
-              <option value="">Selecione…</option>
-              {customers.data?.items.map((customer) => (
-                <option key={customer.id} value={customer.id}>{customer.name}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="OS (opcional)">
-            <Select value={form.jobCardId} onChange={(e) => set('jobCardId', e.target.value)}>
-              <option value="">Sem OS</option>
-              {jobCards.data?.items.map((job) => (
-                <option key={job.id} value={job.id}>{job.number}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Válido até">
-            <Input
-              type="date"
-              value={form.validUntil}
-              onChange={(e) => set('validUntil', e.target.value)}
-            />
-          </Field>
-          <div className="col-span-2">
-            <Field label="Observações">
-              <Input value={form.notes} onChange={(e) => set('notes', e.target.value)} />
+        <form
+          id="quotation-form"
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (canSave) create.mutate();
+          }}
+        >
+          <ErrorText>{error}</ErrorText>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Filial">
+              <Select
+                required
+                value={form.branchId}
+                onChange={(e) => set('branchId', e.target.value)}
+              >
+                <option value="">Selecione…</option>
+                {branches.data?.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Cliente">
+              <Select
+                required
+                value={form.customerId}
+                onChange={(e) => set('customerId', e.target.value)}
+              >
+                <option value="">Selecione…</option>
+                {customers.data?.items.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="OS (opcional)">
+              <Select
+                value={form.jobCardId}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    jobCardId: e.target.value,
+                    copyFromJobCard: e.target.value ? prev.copyFromJobCard : false,
+                  }))
+                }
+              >
+                <option value="">Sem OS</option>
+                {jobCards.data?.items.map((job) => (
+                  <option key={job.id} value={job.id}>
+                    {job.number}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Válido até">
+              <Input
+                type="date"
+                value={form.validUntil}
+                onChange={(e) => set('validUntil', e.target.value)}
+              />
             </Field>
           </div>
-          <label className="col-span-2 flex items-center gap-2 text-xs text-slate-600">
+          <Field label="Observações">
+            <Input value={form.notes} onChange={(e) => set('notes', e.target.value)} />
+          </Field>
+          <label className="flex items-center gap-2 text-sm text-ink">
             <input
               type="checkbox"
               checked={form.copyFromJobCard}
@@ -221,7 +289,7 @@ export default function QuotationsPage(): JSX.Element {
             />
             Copiar itens da OS selecionada
           </label>
-        </div>
+        </form>
       </Modal>
     </div>
   );

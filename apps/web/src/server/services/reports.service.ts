@@ -20,7 +20,14 @@ export async function financialReport(query: QueryReportDto) {
   if (query.branchId) expenseWhere.branchId = query.branchId;
   if (range) expenseWhere.expenseDate = range;
 
-  const [invoiced, received, expenses] = await Promise.all([
+  // Saldo em aberto é uma foto do momento: não depende do período.
+  const openWhere: Prisma.InvoiceWhereInput = {
+    deletedAt: null,
+    status: { in: ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE'] },
+  };
+  if (query.branchId) openWhere.branchId = query.branchId;
+
+  const [invoiced, received, expenses, open] = await Promise.all([
     getDb().invoice.aggregate({
       where: invoiceWhere,
       _sum: { total: true },
@@ -34,6 +41,11 @@ export async function financialReport(query: QueryReportDto) {
     getDb().expense.aggregate({
       where: expenseWhere,
       _sum: { amount: true },
+      _count: { _all: true },
+    }),
+    getDb().invoice.aggregate({
+      where: openWhere,
+      _sum: { total: true, amountPaid: true },
       _count: { _all: true },
     }),
   ]);
@@ -50,6 +62,12 @@ export async function financialReport(query: QueryReportDto) {
     received: { total: receivedTotal, count: received._count._all },
     expenses: { total: expensesTotal, count: expenses._count._all },
     net: receivedTotal.minus(expensesTotal),
+    receivable: {
+      total: (open._sum.total ?? new Prisma.Decimal(0)).minus(
+        open._sum.amountPaid ?? new Prisma.Decimal(0),
+      ),
+      count: open._count._all,
+    },
   };
 }
 

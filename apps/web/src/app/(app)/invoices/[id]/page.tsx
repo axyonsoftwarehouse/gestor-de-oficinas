@@ -7,7 +7,6 @@ import { apiFetch, apiFetchText } from '@/lib/api';
 import type { Invoice } from '@/lib/types';
 import { formatMoney, formatDateTime } from '@/lib/format';
 import {
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -18,9 +17,13 @@ import {
   Spinner,
   Td,
   Th,
+  StatusBadge,
 } from '@/components/ui';
+import { useConfirm } from '@/components/confirm';
+import { INVOICE_STATUS, LINE_TYPE, enumLabel } from '@/lib/labels';
 
 export default function InvoiceDetailPage(): JSX.Element {
+  const confirm = useConfirm();
   const params = useParams<{ id: string }>();
   const id = params.id;
   const qc = useQueryClient();
@@ -91,7 +94,7 @@ export default function InvoiceDetailPage(): JSX.Element {
         subtitle={data.customer?.name ?? ''}
         actions={
           <div className="flex items-center gap-2">
-            <Badge tone={data.status === 'PAID' ? 'green' : 'amber'}>{data.status}</Badge>
+            <StatusBadge map={INVOICE_STATUS} value={data.status} />
             <Button variant="secondary" onClick={openDocument}>
               Documento
             </Button>
@@ -99,8 +102,8 @@ export default function InvoiceDetailPage(): JSX.Element {
               <Button
                 variant="danger"
                 disabled={cancel.isPending}
-                onClick={() => {
-                  if (window.confirm(`Cancelar a fatura ${data.number}?`)) {
+                onClick={async () => {
+                  if (await confirm({ title: `Cancelar a fatura ${data.number}?`, confirmLabel: 'Cancelar', tone: 'danger' })) {
                     cancel.mutate();
                   }
                 }}
@@ -129,7 +132,7 @@ export default function InvoiceDetailPage(): JSX.Element {
               <tbody>
                 {data.lines.map((line) => (
                   <tr key={line.id} className="border-b border-slate-100">
-                    <Td>{line.description ?? line.type}</Td>
+                    <Td>{line.description ?? enumLabel(LINE_TYPE, line.type)}</Td>
                     <Td className="text-right">{String(line.quantity)}</Td>
                     <Td className="text-right">{formatMoney(line.total)}</Td>
                   </tr>

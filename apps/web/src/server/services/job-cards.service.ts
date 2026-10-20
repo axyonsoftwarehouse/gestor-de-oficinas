@@ -29,12 +29,14 @@ const ALLOWED_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
 };
 
 const detailInclude = {
-  customer: { select: { id: true, name: true, phone: true } },
+  branch: { select: { id: true, name: true } },
+  customer: { select: { id: true, name: true, phone: true, email: true } },
   vehicle: {
     select: {
       id: true,
       plate: true,
       vin: true,
+      year: true,
       brand: { select: { name: true } },
       model: { select: { name: true } },
     },
@@ -48,6 +50,11 @@ const detailInclude = {
   mechanics: { include: { user: { select: { id: true, name: true } } } },
   statusHistory: { orderBy: { changedAt: 'asc' as const } },
   inspection: { select: { id: true, status: true } },
+  invoices: {
+    where: { deletedAt: null },
+    select: { id: true, number: true, status: true },
+    orderBy: { createdAt: 'desc' as const },
+  },
   _count: { select: { quotations: true, invoices: true } },
 } satisfies Prisma.JobCardInclude;
 

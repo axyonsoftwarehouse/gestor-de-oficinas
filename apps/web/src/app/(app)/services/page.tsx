@@ -1,23 +1,26 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { apiFetch, buildQuery } from '@/lib/api';
-import type { Paginated, ServiceItem } from '@/lib/types';
+import { toast } from 'sonner';
+import { apiFetch } from '@/lib/api';
 import { formatMoney, formatNumber } from '@/lib/format';
+import { hasPermission } from '@/lib/permissions';
+import type { ServiceItem } from '@/lib/types';
+import { useDebounced } from '@/lib/use-debounced';
+import { useAuth } from '@/components/auth-provider';
+import { useConfirm } from '@/components/confirm';
+import { DataTable, usePagedQuery, type Column } from '@/components/data-table';
 import {
   Badge,
   Button,
   Card,
-  EmptyState,
   ErrorText,
   Field,
   Input,
   Modal,
   PageHeader,
-  Spinner,
-  Td,
-  Th,
+  SearchInput,
   Textarea,
 } from '@/components/ui';
 
@@ -39,30 +42,67 @@ const EMPTY: ServiceForm = {
   isActive: true,
 };
 
+const COLUMNS: Column<ServiceItem>[] = [
+  {
+    key: 'name',
+    header: 'Nome',
+    cell: (service) => (
+      <div>
+        <div className="font-medium">{service.name}</div>
+        {service.code ? <div className="text-xs text-ink-muted">{service.code}</div> : null}
+      </div>
+    ),
+  },
+  {
+    key: 'basePrice',
+    header: 'Preço base',
+    align: 'right',
+    cell: (service) => formatMoney(service.basePrice),
+  },
+  {
+    key: 'standardTime',
+    header: 'Tempo padrão (h)',
+    align: 'right',
+    cell: (service) =>
+      service.standardTime != null ? formatNumber(service.standardTime) : '-',
+  },
+  {
+    key: 'status',
+    header: 'Status',
+    cell: (service) => (
+      <Badge tone={service.isActive ? 'green' : 'slate'}>
+        {service.isActive ? 'Ativo' : 'Inativo'}
+      </Badge>
+    ),
+  },
+];
+
 export default function ServicesPage(): JSX.Element {
   const qc = useQueryClient();
+  const confirm = useConfirm();
+  const { session } = useAuth();
+  const granted = session?.permissions ?? [];
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounced(search);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ServiceItem | null>(null);
   const [form, setForm] = useState<ServiceForm>(EMPTY);
   const [error, setError] = useState('');
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['services', search],
-    queryFn: () => apiFetch<Paginated<ServiceItem>>(`/services${buildQuery({ search })}`),
+  const { query, page, setPage } = usePagedQuery<ServiceItem>('services', '/services', {
+    search: debouncedSearch,
   });
 
   const save = useMutation({
     mutationFn: async () => {
-      const payload = {
+      const body = JSON.stringify({
         name: form.name,
         code: form.code || undefined,
         description: form.description || undefined,
         basePrice: form.basePrice ? Number(form.basePrice) : undefined,
         standardTime: form.standardTime ? Number(form.standardTime) : undefined,
         isActive: form.isActive,
-      };
-      const body = JSON.stringify(payload);
+      });
       if (editing) {
         await apiFetch(`/services/${editing.id}`, { method: 'PATCH', body });
       } else {
@@ -72,13 +112,18 @@ export default function ServicesPage(): JSX.Element {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['services'] });
       setOpen(false);
+      toast.success(editing ? 'Serviço atualizado' : 'Serviço cadastrado');
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Erro ao salvar'),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => apiFetch(`/services/${id}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['services'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['services'] });
+      toast.success('Serviço excluído');
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Erro ao excluir'),
   });
 
   function openCreate(): void {
@@ -102,81 +147,68 @@ export default function ServicesPage(): JSX.Element {
     setOpen(true);
   }
 
+  async function confirmRemove(service: ServiceItem): Promise<void> {
+    const ok = await confirm({
+      title: 'Excluir serviço',
+      description: `"${service.name}" deixará de aparecer no catálogo. OS e orçamentos já emitidos não mudam.`,
+      confirmLabel: 'Excluir',
+      tone: 'danger',
+    });
+    if (ok) remove.mutate(service.id);
+  }
+
   function set<K extends keyof ServiceForm>(key: K, value: ServiceForm[K]): void {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
+
+  const canCreate = hasPermission(granted, 'service.create');
+  const canEdit = hasPermission(granted, 'service.edit');
+  const canDelete = hasPermission(granted, 'service.delete');
 
   return (
     <div>
       <PageHeader
         title="Serviços"
         subtitle="Catálogo de serviços para OS e orçamentos"
-        actions={<Button onClick={openCreate}>Novo serviço</Button>}
+        actions={canCreate ? <Button onClick={openCreate}>Novo serviço</Button> : null}
       />
 
       <Card className="p-4">
-        <div className="mb-3 max-w-sm">
-          <Input
-            placeholder="Buscar por nome ou código…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+        <SearchInput
+          className="mb-3"
+          aria-label="Buscar serviços"
+          placeholder="Buscar por nome ou código…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
 
-        {isLoading ? (
-          <Spinner />
-        ) : !data || data.items.length === 0 ? (
-          <EmptyState message="Nenhum serviço cadastrado." />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-200">
-                  <Th>Nome</Th>
-                  <Th>Código</Th>
-                  <Th className="text-right">Preço base</Th>
-                  <Th className="text-right">Tempo padrão (h)</Th>
-                  <Th>Status</Th>
-                  <Th />
-                </tr>
-              </thead>
-              <tbody>
-                {data.items.map((service) => (
-                  <tr key={service.id} className="border-b border-slate-100">
-                    <Td>{service.name}</Td>
-                    <Td>{service.code ?? '-'}</Td>
-                    <Td className="text-right">{formatMoney(service.basePrice)}</Td>
-                    <Td className="text-right">
-                      {service.standardTime != null ? formatNumber(service.standardTime) : '-'}
-                    </Td>
-                    <Td>
-                      <Badge tone={service.isActive ? 'green' : 'slate'}>
-                        {service.isActive ? 'Ativo' : 'Inativo'}
-                      </Badge>
-                    </Td>
-                    <Td className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="secondary" onClick={() => openEdit(service)}>
-                          Editar
-                        </Button>
-                        <Button
-                          variant="danger"
-                          onClick={() => {
-                            if (window.confirm(`Excluir ${service.name}?`)) {
-                              remove.mutate(service.id);
-                            }
-                          }}
-                        >
-                          Excluir
-                        </Button>
-                      </div>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable
+          query={query}
+          columns={COLUMNS}
+          rowKey={(service) => service.id}
+          page={page}
+          onPageChange={setPage}
+          onRowClick={canEdit ? openEdit : undefined}
+          rowActions={(service) => [
+            { label: 'Editar', onSelect: () => openEdit(service), hidden: !canEdit },
+            {
+              label: 'Excluir',
+              onSelect: () => void confirmRemove(service),
+              danger: true,
+              hidden: !canDelete,
+            },
+          ]}
+          emptyMessage={
+            debouncedSearch
+              ? 'Nenhum serviço encontrado para essa busca.'
+              : 'Nenhum serviço cadastrado ainda.'
+          }
+          emptyAction={
+            !debouncedSearch && canCreate ? (
+              <Button onClick={openCreate}>Cadastrar o primeiro serviço</Button>
+            ) : undefined
+          }
+        />
       </Card>
 
       <Modal
@@ -188,48 +220,62 @@ export default function ServicesPage(): JSX.Element {
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={() => save.mutate()} disabled={save.isPending || !form.name}>
+            <Button type="submit" form="service-form" disabled={save.isPending || !form.name}>
               {save.isPending ? 'Salvando…' : 'Salvar'}
             </Button>
           </>
         }
       >
-        <ErrorText>{error}</ErrorText>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Nome">
-            <Input value={form.name} onChange={(e) => set('name', e.target.value)} />
-          </Field>
-          <Field label="Código">
-            <Input value={form.code} onChange={(e) => set('code', e.target.value)} />
-          </Field>
-          <Field label="Preço base">
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.basePrice}
-              onChange={(e) => set('basePrice', e.target.value)}
-            />
-          </Field>
-          <Field label="Tempo padrão (horas)">
-            <Input
-              type="number"
-              step="0.25"
-              min="0"
-              value={form.standardTime}
-              onChange={(e) => set('standardTime', e.target.value)}
-            />
-          </Field>
-          <div className="col-span-2">
-            <Field label="Descrição">
-              <Textarea
-                rows={3}
-                value={form.description}
-                onChange={(e) => set('description', e.target.value)}
+        <form
+          id="service-form"
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (form.name && !save.isPending) save.mutate();
+          }}
+        >
+          <ErrorText>{error}</ErrorText>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Nome">
+              <Input
+                autoFocus
+                required
+                value={form.name}
+                onChange={(e) => set('name', e.target.value)}
+              />
+            </Field>
+            <Field label="Código">
+              <Input value={form.code} onChange={(e) => set('code', e.target.value)} />
+            </Field>
+            <Field label="Preço base">
+              <Input
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                value={form.basePrice}
+                onChange={(e) => set('basePrice', e.target.value)}
+              />
+            </Field>
+            <Field label="Tempo padrão (horas)">
+              <Input
+                type="number"
+                inputMode="decimal"
+                step="0.25"
+                min="0"
+                value={form.standardTime}
+                onChange={(e) => set('standardTime', e.target.value)}
               />
             </Field>
           </div>
-          <label className="col-span-2 flex items-center gap-2 text-xs text-slate-600">
+          <Field label="Descrição">
+            <Textarea
+              rows={3}
+              value={form.description}
+              onChange={(e) => set('description', e.target.value)}
+            />
+          </Field>
+          <label className="flex items-center gap-2 text-sm text-ink">
             <input
               type="checkbox"
               checked={form.isActive}
@@ -237,7 +283,7 @@ export default function ServicesPage(): JSX.Element {
             />
             Serviço ativo
           </label>
-        </div>
+        </form>
       </Modal>
     </div>
   );

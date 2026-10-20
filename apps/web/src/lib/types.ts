@@ -14,6 +14,8 @@ export interface Customer {
   email?: string | null;
   phone?: string | null;
   city?: string | null;
+  state?: string | null;
+  zip?: string | null;
   createdAt: string;
 }
 
@@ -58,12 +60,32 @@ export interface JobCard {
   type: string;
   status: JobStatus;
   customerId: string;
-  customer?: { id: string; name: string } | null;
-  vehicle?: { id: string; plate?: string | null } | null;
+  priority?: number;
+  customer?: { id: string; name: string; phone?: string | null; email?: string | null } | null;
+  vehicle?: {
+    id: string;
+    plate?: string | null;
+    vin?: string | null;
+    year?: number | null;
+    brand?: { name: string } | null;
+    model?: { name: string } | null;
+  } | null;
+  branch?: { id: string; name: string } | null;
+  advisor?: { id: string; name: string } | null;
+  odometerIn?: string | number | null;
+  fuelLevel?: string | null;
+  customerComplaint?: string | null;
+  internalNotes?: string | null;
   total: string | number;
   subtotal: string | number;
   taxTotal: string | number;
   createdAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  deliveredAt?: string | null;
+  inspection?: { id: string; status: string } | null;
+  invoices?: { id: string; number: string; status: string }[];
+  _count?: { quotations: number; invoices: number };
   lines?: JobLine[];
   mechanics?: JobMechanic[];
   statusHistory?: { id: string; toStatus: JobStatus; changedAt: string }[];

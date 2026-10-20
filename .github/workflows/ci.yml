@@ -54,6 +54,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Testes dos scripts de backup
+        run: pnpm test:scripts
+
       - name: Build do web
         run: pnpm --filter @gestor/web build
 

@@ -2,33 +2,48 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { apiFetch } from '@/lib/api';
+import { hasPermission } from '@/lib/permissions';
 import type { BranchFull } from '@/lib/types';
+import { useAuth } from '@/components/auth-provider';
+import { useConfirm } from '@/components/confirm';
+import { DataTable, useLocalPaged, type Column } from '@/components/data-table';
 import {
   Button,
   Card,
-  EmptyState,
   ErrorText,
   Field,
   Input,
   Modal,
   PageHeader,
-  Spinner,
-  Td,
-  Th,
 } from '@/components/ui';
+
+const COLUMNS: Column<BranchFull>[] = [
+  {
+    key: 'name',
+    header: 'Nome',
+    cell: (branch) => <span className="font-medium">{branch.name}</span>,
+  },
+  { key: 'code', header: 'Código', cell: (branch) => branch.code ?? '-' },
+];
 
 export default function BranchesPage(): JSX.Element {
   const qc = useQueryClient();
+  const confirm = useConfirm();
+  const { session } = useAuth();
+  const granted = session?.permissions ?? [];
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<BranchFull | null>(null);
   const [form, setForm] = useState({ name: '', code: '' });
   const [error, setError] = useState('');
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['branches-full'],
+  // O endpoint devolve todas as filiais; a paginação é feita no cliente.
+  const branches = useQuery({
+    queryKey: ['branches', 'full'],
     queryFn: () => apiFetch<BranchFull[]>('/branches'),
   });
+  const { query, page, setPage } = useLocalPaged(branches);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -40,19 +55,20 @@ export default function BranchesPage(): JSX.Element {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['branches-full'] });
       qc.invalidateQueries({ queryKey: ['branches'] });
       setOpen(false);
+      toast.success(editing ? 'Filial atualizada' : 'Filial cadastrada');
     },
-    onError: (err) => setError(err instanceof Error ? err.message : 'Erro'),
+    onError: (err) => setError(err instanceof Error ? err.message : 'Erro ao salvar'),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => apiFetch(`/branches/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['branches-full'] });
       qc.invalidateQueries({ queryKey: ['branches'] });
+      toast.success('Filial excluída');
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Erro ao excluir'),
   });
 
   function openCreate(): void {
@@ -69,53 +85,50 @@ export default function BranchesPage(): JSX.Element {
     setOpen(true);
   }
 
+  async function confirmRemove(branch: BranchFull): Promise<void> {
+    const ok = await confirm({
+      title: 'Excluir filial',
+      description: `"${branch.name}" deixará de aparecer nas listas. OS e estoque vinculados são preservados.`,
+      confirmLabel: 'Excluir',
+      tone: 'danger',
+    });
+    if (ok) remove.mutate(branch.id);
+  }
+
+  const canCreate = hasPermission(granted, 'branch.create');
+  const canEdit = hasPermission(granted, 'branch.edit');
+  const canDelete = hasPermission(granted, 'branch.delete');
+
   return (
     <div>
       <PageHeader
         title="Filiais"
         subtitle="Unidades da oficina"
-        actions={<Button onClick={openCreate}>Nova filial</Button>}
+        actions={canCreate ? <Button onClick={openCreate}>Nova filial</Button> : null}
       />
 
       <Card className="p-4">
-        {isLoading ? (
-          <Spinner />
-        ) : !data || data.length === 0 ? (
-          <EmptyState message="Nenhuma filial cadastrada." />
-        ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <Th>Nome</Th>
-                <Th>Código</Th>
-                <Th />
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((branch) => (
-                <tr key={branch.id} className="border-b border-slate-100">
-                  <Td>{branch.name}</Td>
-                  <Td>{branch.code ?? '-'}</Td>
-                  <Td className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="secondary" onClick={() => openEdit(branch)}>
-                        Editar
-                      </Button>
-                      <Button
-                        variant="danger"
-                        onClick={() => {
-                          if (window.confirm(`Excluir ${branch.name}?`)) remove.mutate(branch.id);
-                        }}
-                      >
-                        Excluir
-                      </Button>
-                    </div>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <DataTable
+          query={query}
+          columns={COLUMNS}
+          rowKey={(branch) => branch.id}
+          page={page}
+          onPageChange={setPage}
+          onRowClick={canEdit ? openEdit : undefined}
+          rowActions={(branch) => [
+            { label: 'Editar', onSelect: () => openEdit(branch), hidden: !canEdit },
+            {
+              label: 'Excluir',
+              onSelect: () => void confirmRemove(branch),
+              danger: true,
+              hidden: !canDelete,
+            },
+          ]}
+          emptyMessage="Nenhuma filial cadastrada ainda."
+          emptyAction={
+            canCreate ? <Button onClick={openCreate}>Cadastrar a primeira filial</Button> : undefined
+          }
+        />
       </Card>
 
       <Modal
@@ -127,21 +140,38 @@ export default function BranchesPage(): JSX.Element {
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={() => save.mutate()} disabled={save.isPending || !form.name}>
+            <Button type="submit" form="branch-form" disabled={save.isPending || !form.name}>
               {save.isPending ? 'Salvando…' : 'Salvar'}
             </Button>
           </>
         }
       >
-        <ErrorText>{error}</ErrorText>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Nome">
-            <Input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-          </Field>
-          <Field label="Código">
-            <Input value={form.code} onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))} />
-          </Field>
-        </div>
+        <form
+          id="branch-form"
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (form.name && !save.isPending) save.mutate();
+          }}
+        >
+          <ErrorText>{error}</ErrorText>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Nome">
+              <Input
+                autoFocus
+                required
+                value={form.name}
+                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              />
+            </Field>
+            <Field label="Código">
+              <Input
+                value={form.code}
+                onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))}
+              />
+            </Field>
+          </div>
+        </form>
       </Modal>
     </div>
   );

@@ -1,24 +1,26 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { apiFetch, buildQuery } from '@/lib/api';
+import { toast } from 'sonner';
+import { apiFetch } from '@/lib/api';
 import { formatDate, formatMoney, toInputDate } from '@/lib/format';
+import { hasPermission } from '@/lib/permissions';
 import { useBranches } from '@/lib/queries';
 import type { Expense, ExpenseList } from '@/lib/types';
+import { useDebounced } from '@/lib/use-debounced';
+import { useAuth } from '@/components/auth-provider';
+import { useConfirm } from '@/components/confirm';
+import { DataTable, usePagedQuery, type Column } from '@/components/data-table';
 import {
   Button,
   Card,
-  EmptyState,
   ErrorText,
   Field,
   Input,
   Modal,
   PageHeader,
   Select,
-  Spinner,
-  Td,
-  Th,
   Textarea,
 } from '@/components/ui';
 
@@ -42,10 +44,14 @@ function emptyForm(branchId: string): ExpenseForm {
 
 export default function ExpensesPage(): JSX.Element {
   const qc = useQueryClient();
+  const confirm = useConfirm();
+  const { session } = useAuth();
+  const granted = session?.permissions ?? [];
   const { data: branches } = useBranches();
 
   const [filterBranch, setFilterBranch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const debouncedCategory = useDebounced(filterCategory);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
 
@@ -54,17 +60,11 @@ export default function ExpensesPage(): JSX.Element {
   const [form, setForm] = useState<ExpenseForm>(emptyForm(''));
   const [error, setError] = useState('');
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['expenses', filterBranch, filterCategory, from, to],
-    queryFn: () =>
-      apiFetch<ExpenseList>(
-        `/expenses${buildQuery({
-          branchId: filterBranch,
-          category: filterCategory,
-          from,
-          to,
-        })}`,
-      ),
+  const { query, page, setPage } = usePagedQuery<Expense, ExpenseList>('expenses', '/expenses', {
+    branchId: filterBranch,
+    category: debouncedCategory,
+    from,
+    to,
   });
 
   const save = useMutation({
@@ -85,13 +85,18 @@ export default function ExpensesPage(): JSX.Element {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expenses'] });
       setOpen(false);
+      toast.success(editing ? 'Despesa atualizada' : 'Despesa lançada');
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Erro ao salvar'),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => apiFetch(`/expenses/${id}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['expenses'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses'] });
+      toast.success('Despesa excluída');
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Erro ao excluir'),
   });
 
   function openCreate(): void {
@@ -114,6 +119,16 @@ export default function ExpensesPage(): JSX.Element {
     setOpen(true);
   }
 
+  async function confirmRemove(expense: Expense): Promise<void> {
+    const ok = await confirm({
+      title: 'Excluir despesa',
+      description: `A despesa "${expense.category}" de ${formatMoney(expense.amount)} será excluída.`,
+      confirmLabel: 'Excluir',
+      tone: 'danger',
+    });
+    if (ok) remove.mutate(expense.id);
+  }
+
   function set<K extends keyof ExpenseForm>(key: K, value: ExpenseForm[K]): void {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -121,18 +136,50 @@ export default function ExpensesPage(): JSX.Element {
   const branchName = (id: string): string =>
     branches?.find((branch) => branch.id === id)?.name ?? '-';
 
-  const canSave = Boolean(form.branchId && form.category && form.amount);
+  const columns: Column<Expense>[] = [
+    {
+      key: 'date',
+      header: 'Data',
+      cell: (expense) => <span className="whitespace-nowrap">{formatDate(expense.expenseDate)}</span>,
+    },
+    {
+      key: 'category',
+      header: 'Categoria',
+      cell: (expense) => (
+        <div>
+          <div className="font-medium">{expense.category}</div>
+          {expense.description ? (
+            <div className="text-xs text-ink-muted">{expense.description}</div>
+          ) : null}
+        </div>
+      ),
+    },
+    { key: 'branch', header: 'Filial', cell: (expense) => branchName(expense.branchId) },
+    { key: 'job', header: 'OS', cell: (expense) => expense.jobCard?.number ?? '-' },
+    {
+      key: 'amount',
+      header: 'Valor',
+      align: 'right',
+      cell: (expense) => formatMoney(expense.amount),
+    },
+  ];
+
+  const canCreate = hasPermission(granted, 'expense.create');
+  const canEdit = hasPermission(granted, 'expense.edit');
+  const canDelete = hasPermission(granted, 'expense.delete');
+  const canSave = Boolean(form.branchId && form.category && form.amount) && !save.isPending;
+  const filtered = Boolean(filterBranch || debouncedCategory || from || to);
 
   return (
     <div>
       <PageHeader
         title="Despesas"
         subtitle="Lançamento e controle de despesas da oficina"
-        actions={<Button onClick={openCreate}>Nova despesa</Button>}
+        actions={canCreate ? <Button onClick={openCreate}>Nova despesa</Button> : null}
       />
 
       <Card className="p-4">
-        <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Filial">
             <Select value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)}>
               <option value="">Todas</option>
@@ -145,6 +192,7 @@ export default function ExpensesPage(): JSX.Element {
           </Field>
           <Field label="Categoria">
             <Input
+              type="search"
               placeholder="Ex.: Aluguel"
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
@@ -158,60 +206,37 @@ export default function ExpensesPage(): JSX.Element {
           </Field>
         </div>
 
-        <div className="mb-3 text-sm text-ink-muted">
-          Total filtrado: <strong className="text-ink">{formatMoney(data?.sum ?? 0)}</strong>
-        </div>
-
-        {isLoading ? (
-          <Spinner />
-        ) : !data || data.items.length === 0 ? (
-          <EmptyState message="Nenhuma despesa encontrada." />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-200">
-                  <Th>Data</Th>
-                  <Th>Categoria</Th>
-                  <Th>Descrição</Th>
-                  <Th>Filial</Th>
-                  <Th>OS</Th>
-                  <Th>Valor</Th>
-                  <Th />
-                </tr>
-              </thead>
-              <tbody>
-                {data.items.map((expense) => (
-                  <tr key={expense.id} className="border-b border-slate-100">
-                    <Td>{formatDate(expense.expenseDate)}</Td>
-                    <Td>{expense.category}</Td>
-                    <Td>{expense.description ?? '-'}</Td>
-                    <Td>{branchName(expense.branchId)}</Td>
-                    <Td>{expense.jobCard?.number ?? '-'}</Td>
-                    <Td>{formatMoney(expense.amount)}</Td>
-                    <Td className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="secondary" onClick={() => openEdit(expense)}>
-                          Editar
-                        </Button>
-                        <Button
-                          variant="danger"
-                          onClick={() => {
-                            if (window.confirm('Excluir esta despesa?')) {
-                              remove.mutate(expense.id);
-                            }
-                          }}
-                        >
-                          Excluir
-                        </Button>
-                      </div>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {query.data ? (
+          <div className="mb-3 text-sm text-ink-muted">
+            Total filtrado: <strong className="text-ink">{formatMoney(query.data.sum)}</strong>
           </div>
-        )}
+        ) : null}
+
+        <DataTable
+          query={query}
+          columns={columns}
+          rowKey={(expense) => expense.id}
+          page={page}
+          onPageChange={setPage}
+          onRowClick={canEdit ? openEdit : undefined}
+          rowActions={(expense) => [
+            { label: 'Editar', onSelect: () => openEdit(expense), hidden: !canEdit },
+            {
+              label: 'Excluir',
+              onSelect: () => void confirmRemove(expense),
+              danger: true,
+              hidden: !canDelete,
+            },
+          ]}
+          emptyMessage={
+            filtered ? 'Nenhuma despesa para esses filtros.' : 'Nenhuma despesa lançada ainda.'
+          }
+          emptyAction={
+            !filtered && canCreate ? (
+              <Button onClick={openCreate}>Lançar a primeira despesa</Button>
+            ) : undefined
+          }
+        />
       </Card>
 
       <Modal
@@ -223,57 +248,71 @@ export default function ExpensesPage(): JSX.Element {
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={() => save.mutate()} disabled={save.isPending || !canSave}>
+            <Button type="submit" form="expense-form" disabled={!canSave}>
               {save.isPending ? 'Salvando…' : 'Salvar'}
             </Button>
           </>
         }
       >
-        <ErrorText>{error}</ErrorText>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Filial">
-            <Select value={form.branchId} onChange={(e) => set('branchId', e.target.value)}>
-              <option value="">Selecione…</option>
-              {branches?.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Categoria">
-            <Input
-              placeholder="Ex.: Aluguel, Água, Peças…"
-              value={form.category}
-              onChange={(e) => set('category', e.target.value)}
-            />
-          </Field>
-          <Field label="Valor">
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.amount}
-              onChange={(e) => set('amount', e.target.value)}
-            />
-          </Field>
-          <Field label="Data">
-            <Input
-              type="date"
-              value={form.expenseDate}
-              onChange={(e) => set('expenseDate', e.target.value)}
-            />
-          </Field>
-          <div className="col-span-2">
-            <Field label="Descrição">
-              <Textarea
-                rows={3}
-                value={form.description}
-                onChange={(e) => set('description', e.target.value)}
+        <form
+          id="expense-form"
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (canSave) save.mutate();
+          }}
+        >
+          <ErrorText>{error}</ErrorText>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Filial">
+              <Select
+                required
+                value={form.branchId}
+                onChange={(e) => set('branchId', e.target.value)}
+              >
+                <option value="">Selecione…</option>
+                {branches?.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Categoria">
+              <Input
+                required
+                placeholder="Ex.: Aluguel, Água, Peças…"
+                value={form.category}
+                onChange={(e) => set('category', e.target.value)}
+              />
+            </Field>
+            <Field label="Valor">
+              <Input
+                required
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                value={form.amount}
+                onChange={(e) => set('amount', e.target.value)}
+              />
+            </Field>
+            <Field label="Data">
+              <Input
+                type="date"
+                value={form.expenseDate}
+                onChange={(e) => set('expenseDate', e.target.value)}
               />
             </Field>
           </div>
-        </div>
+          <Field label="Descrição">
+            <Textarea
+              rows={3}
+              value={form.description}
+              onChange={(e) => set('description', e.target.value)}
+            />
+          </Field>
+        </form>
       </Modal>
     </div>
   );

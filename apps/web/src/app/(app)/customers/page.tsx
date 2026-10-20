@@ -1,22 +1,26 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { apiFetch, buildQuery } from '@/lib/api';
-import type { Customer, Paginated } from '@/lib/types';
+import { toast } from 'sonner';
+import { apiFetch } from '@/lib/api';
+import { CUSTOMER_TYPE, enumLabel, enumOptions } from '@/lib/labels';
+import { hasPermission } from '@/lib/permissions';
+import type { Customer } from '@/lib/types';
+import { useDebounced } from '@/lib/use-debounced';
+import { useAuth } from '@/components/auth-provider';
+import { useConfirm } from '@/components/confirm';
+import { DataTable, usePagedQuery, type Column } from '@/components/data-table';
 import {
   Button,
   Card,
-  EmptyState,
   ErrorText,
   Field,
   Input,
   Modal,
   PageHeader,
+  SearchInput,
   Select,
-  Spinner,
-  Td,
-  Th,
 } from '@/components/ui';
 
 interface CustomerForm {
@@ -41,18 +45,50 @@ const EMPTY: CustomerForm = {
   zip: '',
 };
 
+const COLUMNS: Column<Customer>[] = [
+  {
+    key: 'name',
+    header: 'Nome',
+    cell: (customer) => (
+      <div>
+        <div className="font-medium">{customer.name}</div>
+        <div className="text-xs text-ink-muted">{enumLabel(CUSTOMER_TYPE, customer.type)}</div>
+      </div>
+    ),
+  },
+  { key: 'document', header: 'Documento', cell: (customer) => customer.document ?? '-' },
+  {
+    key: 'contact',
+    header: 'Contato',
+    cell: (customer) => (
+      <div>
+        <div>{customer.phone ?? '-'}</div>
+        {customer.email ? <div className="text-xs text-ink-muted">{customer.email}</div> : null}
+      </div>
+    ),
+  },
+  {
+    key: 'city',
+    header: 'Cidade',
+    cell: (customer) =>
+      customer.city ? `${customer.city}${customer.state ? `/${customer.state}` : ''}` : '-',
+  },
+];
+
 export default function CustomersPage(): JSX.Element {
   const qc = useQueryClient();
+  const confirm = useConfirm();
+  const { session } = useAuth();
+  const granted = session?.permissions ?? [];
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounced(search);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [form, setForm] = useState<CustomerForm>(EMPTY);
   const [error, setError] = useState('');
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['customers', search],
-    queryFn: () =>
-      apiFetch<Paginated<Customer>>(`/customers${buildQuery({ search })}`),
+  const { query, page, setPage } = usePagedQuery<Customer>('customers', '/customers', {
+    search: debouncedSearch,
   });
 
   const save = useMutation({
@@ -67,13 +103,18 @@ export default function CustomersPage(): JSX.Element {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['customers'] });
       setOpen(false);
+      toast.success(editing ? 'Cliente atualizado' : 'Cliente cadastrado');
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Erro ao salvar'),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => apiFetch(`/customers/${id}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['customers'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['customers'] });
+      toast.success('Cliente excluído');
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Erro ao excluir'),
   });
 
   function openCreate(): void {
@@ -92,82 +133,73 @@ export default function CustomersPage(): JSX.Element {
       email: customer.email ?? '',
       phone: customer.phone ?? '',
       city: customer.city ?? '',
-      state: '',
-      zip: '',
+      state: customer.state ?? '',
+      zip: customer.zip ?? '',
     });
     setError('');
     setOpen(true);
+  }
+
+  async function confirmRemove(customer: Customer): Promise<void> {
+    const ok = await confirm({
+      title: 'Excluir cliente',
+      description: `"${customer.name}" deixará de aparecer nas listas. O histórico de OS e faturas é preservado.`,
+      confirmLabel: 'Excluir',
+      tone: 'danger',
+    });
+    if (ok) remove.mutate(customer.id);
   }
 
   function set<K extends keyof CustomerForm>(key: K, value: CustomerForm[K]): void {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  const canCreate = hasPermission(granted, 'customer.create');
+  const canEdit = hasPermission(granted, 'customer.edit');
+  const canDelete = hasPermission(granted, 'customer.delete');
+
   return (
     <div>
       <PageHeader
         title="Clientes"
         subtitle="Cadastro de clientes da oficina"
-        actions={<Button onClick={openCreate}>Novo cliente</Button>}
+        actions={canCreate ? <Button onClick={openCreate}>Novo cliente</Button> : null}
       />
 
       <Card className="p-4">
-        <div className="mb-3 max-w-sm">
-          <Input
-            placeholder="Buscar por nome, documento, e-mail…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+        <SearchInput
+          className="mb-3"
+          aria-label="Buscar clientes"
+          placeholder="Buscar por nome, documento, e-mail, telefone…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
 
-        {isLoading ? (
-          <Spinner />
-        ) : !data || data.items.length === 0 ? (
-          <EmptyState message="Nenhum cliente encontrado." />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-200">
-                  <Th>Nome</Th>
-                  <Th>Documento</Th>
-                  <Th>E-mail</Th>
-                  <Th>Telefone</Th>
-                  <Th>Cidade</Th>
-                  <Th />
-                </tr>
-              </thead>
-              <tbody>
-                {data.items.map((customer) => (
-                  <tr key={customer.id} className="border-b border-slate-100">
-                    <Td>{customer.name}</Td>
-                    <Td>{customer.document ?? '-'}</Td>
-                    <Td>{customer.email ?? '-'}</Td>
-                    <Td>{customer.phone ?? '-'}</Td>
-                    <Td>{customer.city ?? '-'}</Td>
-                    <Td className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="secondary" onClick={() => openEdit(customer)}>
-                          Editar
-                        </Button>
-                        <Button
-                          variant="danger"
-                          onClick={() => {
-                            if (window.confirm(`Excluir ${customer.name}?`)) {
-                              remove.mutate(customer.id);
-                            }
-                          }}
-                        >
-                          Excluir
-                        </Button>
-                      </div>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable
+          query={query}
+          columns={COLUMNS}
+          rowKey={(customer) => customer.id}
+          page={page}
+          onPageChange={setPage}
+          onRowClick={canEdit ? openEdit : undefined}
+          rowActions={(customer) => [
+            { label: 'Editar', onSelect: () => openEdit(customer), hidden: !canEdit },
+            {
+              label: 'Excluir',
+              onSelect: () => void confirmRemove(customer),
+              danger: true,
+              hidden: !canDelete,
+            },
+          ]}
+          emptyMessage={
+            debouncedSearch ? 'Nenhum cliente encontrado para essa busca.' : 'Nenhum cliente cadastrado ainda.'
+          }
+          emptyAction={
+            !debouncedSearch && canCreate ? (
+              <Button onClick={openCreate}>Cadastrar o primeiro cliente</Button>
+            ) : undefined
+          }
+        />
       </Card>
 
       <Modal
@@ -179,45 +211,78 @@ export default function CustomersPage(): JSX.Element {
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={() => save.mutate()} disabled={save.isPending || !form.name}>
+            <Button type="submit" form="customer-form" disabled={save.isPending || !form.name}>
               {save.isPending ? 'Salvando…' : 'Salvar'}
             </Button>
           </>
         }
       >
-        <ErrorText>{error}</ErrorText>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Tipo">
-            <Select
-              value={form.type}
-              onChange={(e) => set('type', e.target.value as CustomerForm['type'])}
-            >
-              <option value="INDIVIDUAL">Pessoa física</option>
-              <option value="COMPANY">Pessoa jurídica</option>
-            </Select>
-          </Field>
-          <Field label="Nome">
-            <Input value={form.name} onChange={(e) => set('name', e.target.value)} />
-          </Field>
-          <Field label="Documento (CPF/CNPJ)">
-            <Input value={form.document} onChange={(e) => set('document', e.target.value)} />
-          </Field>
-          <Field label="Telefone">
-            <Input value={form.phone} onChange={(e) => set('phone', e.target.value)} />
-          </Field>
-          <Field label="E-mail">
-            <Input value={form.email} onChange={(e) => set('email', e.target.value)} />
-          </Field>
-          <Field label="Cidade">
-            <Input value={form.city} onChange={(e) => set('city', e.target.value)} />
-          </Field>
-          <Field label="UF">
-            <Input value={form.state} onChange={(e) => set('state', e.target.value)} />
-          </Field>
-          <Field label="CEP">
-            <Input value={form.zip} onChange={(e) => set('zip', e.target.value)} />
-          </Field>
-        </div>
+        <form
+          id="customer-form"
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (form.name && !save.isPending) save.mutate();
+          }}
+        >
+          <ErrorText>{error}</ErrorText>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Tipo">
+              <Select
+                value={form.type}
+                onChange={(e) => set('type', e.target.value as CustomerForm['type'])}
+              >
+                {enumOptions(CUSTOMER_TYPE).map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Nome">
+              <Input
+                autoFocus
+                required
+                value={form.name}
+                onChange={(e) => set('name', e.target.value)}
+              />
+            </Field>
+            <Field label={form.type === 'COMPANY' ? 'CNPJ' : 'CPF'}>
+              <Input value={form.document} onChange={(e) => set('document', e.target.value)} />
+            </Field>
+            <Field label="Telefone">
+              <Input
+                type="tel"
+                value={form.phone}
+                onChange={(e) => set('phone', e.target.value)}
+              />
+            </Field>
+            <Field label="E-mail">
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => set('email', e.target.value)}
+              />
+            </Field>
+            <Field label="Cidade">
+              <Input value={form.city} onChange={(e) => set('city', e.target.value)} />
+            </Field>
+            <Field label="UF">
+              <Input
+                maxLength={2}
+                value={form.state}
+                onChange={(e) => set('state', e.target.value.toUpperCase())}
+              />
+            </Field>
+            <Field label="CEP">
+              <Input
+                inputMode="numeric"
+                value={form.zip}
+                onChange={(e) => set('zip', e.target.value)}
+              />
+            </Field>
+          </div>
+        </form>
       </Modal>
     </div>
   );

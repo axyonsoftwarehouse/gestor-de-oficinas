@@ -8,7 +8,6 @@ import { useServices } from '@/lib/queries';
 import type { Invoice, Quotation } from '@/lib/types';
 import { formatMoney } from '@/lib/format';
 import {
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -20,7 +19,9 @@ import {
   Spinner,
   Td,
   Th,
+  StatusBadge,
 } from '@/components/ui';
+import { LINE_TYPE, QUOTATION_STATUS, enumLabel } from '@/lib/labels';
 
 export default function QuotationDetailPage(): JSX.Element {
   const params = useParams<{ id: string }>();
@@ -117,7 +118,7 @@ export default function QuotationDetailPage(): JSX.Element {
       <PageHeader
         title={`Orçamento ${data.number}`}
         subtitle={data.customer?.name ?? ''}
-        actions={<Badge>{data.status}</Badge>}
+        actions={<StatusBadge map={QUOTATION_STATUS} value={data.status} />}
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -139,7 +140,7 @@ export default function QuotationDetailPage(): JSX.Element {
               <tbody>
                 {data.lines.map((item) => (
                   <tr key={item.id} className="border-b border-slate-100">
-                    <Td>{item.type}</Td>
+                    <Td>{enumLabel(LINE_TYPE, item.type)}</Td>
                     <Td>{item.description ?? '-'}</Td>
                     <Td className="text-right">{String(item.quantity)}</Td>
                     <Td className="text-right">{formatMoney(item.total)}</Td>

@@ -38,6 +38,9 @@ packages/database/prisma/migrations/dev.db*
 # PostgreSQL portable de teste (scripts/pg-test.ps1)
 .pgtest/
 
+# Backups locais
+.backups/
+
 # Editor / OS
 .DS_Store
 .idea/
