@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import type { InspectionTemplate } from '@/lib/types';
 import { formatDate } from '@/lib/format';
+import { QUESTION_TYPE, enumLabel } from '@/lib/labels';
 import {
   Badge,
   Button,
@@ -79,7 +80,7 @@ export default function InspectionTemplateDetailPage(): JSX.Element {
                         {question.required ? <span className="text-red-500"> *</span> : null}
                       </span>
                       <span className="text-xs text-slate-400">
-                        {question.type}
+                        {enumLabel(QUESTION_TYPE, question.type)}
                         {question.options.length > 0
                           ? ` · ${question.options.map((option) => option.label).join(' / ')}`
                           : ''}

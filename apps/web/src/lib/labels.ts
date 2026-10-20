@@ -57,6 +57,18 @@ export const INSPECTION_RESULT: EnumMap = {
   NOT_APPLICABLE: { label: 'Não se aplica', tone: 'slate' },
 };
 
+/** Tipos de pergunta oferecidos no editor de checklist (subconjunto do enum). */
+export const QUESTION_TYPE: EnumMap = {
+  SELECT: { label: 'Escolha única', tone: 'slate' },
+  MULTISELECT: { label: 'Múltipla escolha', tone: 'slate' },
+  CHECKBOX: { label: 'Caixas de seleção', tone: 'slate' },
+  TEXT: { label: 'Texto curto', tone: 'slate' },
+  TEXTAREA: { label: 'Texto longo', tone: 'slate' },
+  NUMBER: { label: 'Número', tone: 'slate' },
+  DATE: { label: 'Data', tone: 'slate' },
+  BOOLEAN: { label: 'Sim / não', tone: 'slate' },
+};
+
 export const APPROVAL_STATUS: EnumMap = {
   NOT_REQUIRED: { label: 'Não requer', tone: 'slate' },
   PENDING: { label: 'Pendente', tone: 'amber' },
@@ -116,6 +128,46 @@ export const STOCK_MOVEMENT_TYPE: EnumMap = {
 export const CUSTOMER_TYPE: EnumMap = {
   INDIVIDUAL: { label: 'Pessoa física', tone: 'slate' },
   COMPANY: { label: 'Pessoa jurídica', tone: 'slate' },
+};
+
+export const MEMBERSHIP_STATUS: EnumMap = {
+  ACTIVE: { label: 'Ativo', tone: 'green' },
+  INVITED: { label: 'Convidado', tone: 'amber' },
+  DISABLED: { label: 'Desativado', tone: 'red' },
+};
+
+/** Features do catálogo de permissões (`packages/shared/src/permissions.ts`). */
+export const PERMISSION_FEATURE: EnumMap = {
+  dashboard: { label: 'Painel', tone: 'slate' },
+  customer: { label: 'Clientes', tone: 'slate' },
+  vehicle: { label: 'Veículos', tone: 'slate' },
+  appointment: { label: 'Agendamentos', tone: 'slate' },
+  inspection: { label: 'Inspeções', tone: 'slate' },
+  job_card: { label: 'Ordens de serviço', tone: 'slate' },
+  quotation: { label: 'Orçamentos', tone: 'slate' },
+  invoice: { label: 'Faturas', tone: 'slate' },
+  payment: { label: 'Pagamentos', tone: 'slate' },
+  purchase: { label: 'Compras', tone: 'slate' },
+  service: { label: 'Serviços', tone: 'slate' },
+  part: { label: 'Peças', tone: 'slate' },
+  stock: { label: 'Estoque', tone: 'slate' },
+  supplier: { label: 'Fornecedores', tone: 'slate' },
+  expense: { label: 'Despesas', tone: 'slate' },
+  report: { label: 'Relatórios', tone: 'slate' },
+  user: { label: 'Equipe', tone: 'slate' },
+  role: { label: 'Papéis', tone: 'slate' },
+  branch: { label: 'Filiais', tone: 'slate' },
+  custom_field: { label: 'Campos personalizados', tone: 'slate' },
+  setting: { label: 'Configurações', tone: 'slate' },
+};
+
+export const PERMISSION_ACTION: EnumMap = {
+  view: { label: 'Ver', tone: 'slate' },
+  view_own: { label: 'Ver (próprios)', tone: 'slate' },
+  create: { label: 'Criar', tone: 'slate' },
+  edit: { label: 'Editar', tone: 'slate' },
+  delete: { label: 'Excluir', tone: 'slate' },
+  approve: { label: 'Aprovar', tone: 'slate' },
 };
 
 /** Rótulo de um valor de enum; cai no valor cru só se o mapa não o conhecer. */

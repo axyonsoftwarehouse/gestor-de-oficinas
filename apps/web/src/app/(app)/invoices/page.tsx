@@ -1,81 +1,77 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { apiFetch, buildQuery } from '@/lib/api';
-import type { Invoice, Paginated } from '@/lib/types';
-import { formatMoney } from '@/lib/format';
-import {
-  Card,
-  EmptyState,
-  PageHeader,
-  Select,
-  Spinner,
-  Td,
-  Th,
-  StatusBadge,
-} from '@/components/ui';
-import { INVOICE_STATUS } from '@/lib/labels';
+import { formatDate, formatMoney } from '@/lib/format';
+import { INVOICE_STATUS, enumOptions } from '@/lib/labels';
+import type { Invoice } from '@/lib/types';
+import { DataTable, usePagedQuery, type Column } from '@/components/data-table';
+import { Card, PageHeader, Select, StatusBadge } from '@/components/ui';
+
+const COLUMNS: Column<Invoice>[] = [
+  {
+    key: 'number',
+    header: 'Número',
+    cell: (invoice) => <span className="font-medium">{invoice.number}</span>,
+  },
+  { key: 'customer', header: 'Cliente', cell: (invoice) => invoice.customer?.name ?? '-' },
+  { key: 'job', header: 'OS', cell: (invoice) => invoice.jobCard?.number ?? '-' },
+  { key: 'issued', header: 'Emissão', cell: (invoice) => formatDate(invoice.issueDate) },
+  {
+    key: 'status',
+    header: 'Status',
+    cell: (invoice) => <StatusBadge map={INVOICE_STATUS} value={invoice.status} />,
+  },
+  { key: 'total', header: 'Total', align: 'right', cell: (invoice) => formatMoney(invoice.total) },
+  {
+    key: 'paid',
+    header: 'Pago',
+    align: 'right',
+    cell: (invoice) => formatMoney(invoice.amountPaid),
+  },
+];
 
 export default function InvoicesPage(): JSX.Element {
+  const router = useRouter();
   const [status, setStatus] = useState('');
-  const { data, isLoading } = useQuery({
-    queryKey: ['invoices', status],
-    queryFn: () =>
-      apiFetch<Paginated<Invoice>>(`/invoices${buildQuery({ status, pageSize: 50 })}`),
-  });
+
+  const { query, page, setPage } = usePagedQuery<Invoice>('invoices', '/invoices', { status });
+  const openDetail = (invoice: Invoice) => router.push(`/invoices/${invoice.id}`);
 
   return (
     <div>
       <PageHeader title="Faturas" subtitle="Faturamento e recebimentos" />
 
       <Card className="p-4">
-        <div className="mb-3 max-w-xs">
-          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+        <div className="mb-3 w-full sm:max-w-xs">
+          <Select
+            aria-label="Filtrar por status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
             <option value="">Todos os status</option>
-            <option value="DRAFT">Rascunho</option>
-            <option value="ISSUED">Emitida</option>
-            <option value="PARTIALLY_PAID">Parcialmente paga</option>
-            <option value="PAID">Paga</option>
-            <option value="CANCELLED">Cancelada</option>
+            {enumOptions(INVOICE_STATUS).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </Select>
         </div>
 
-        {isLoading ? (
-          <Spinner />
-        ) : !data || data.items.length === 0 ? (
-          <EmptyState message="Nenhuma fatura encontrada." />
-        ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <Th>Número</Th>
-                <Th>Cliente</Th>
-                <Th>Status</Th>
-                <Th className="text-right">Total</Th>
-                <Th className="text-right">Pago</Th>
-                <Th />
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((invoice) => (
-                <tr key={invoice.id} className="border-b border-slate-100">
-                  <Td>{invoice.number}</Td>
-                  <Td>{invoice.customer?.name ?? '-'}</Td>
-                  <Td><StatusBadge map={INVOICE_STATUS} value={invoice.status} /></Td>
-                  <Td className="text-right">{formatMoney(invoice.total)}</Td>
-                  <Td className="text-right">{formatMoney(invoice.amountPaid)}</Td>
-                  <Td className="text-right">
-                    <Link href={`/invoices/${invoice.id}`} className="text-sm underline">
-                      Abrir
-                    </Link>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <DataTable
+          query={query}
+          columns={COLUMNS}
+          rowKey={(invoice) => invoice.id}
+          page={page}
+          onPageChange={setPage}
+          onRowClick={openDetail}
+          rowActions={(invoice) => [{ label: 'Abrir', onSelect: () => openDetail(invoice) }]}
+          emptyMessage={
+            status
+              ? 'Nenhuma fatura com esse status.'
+              : 'Nenhuma fatura ainda. As faturas são geradas a partir de OS ou orçamentos aprovados.'
+          }
+        />
       </Card>
     </div>
   );

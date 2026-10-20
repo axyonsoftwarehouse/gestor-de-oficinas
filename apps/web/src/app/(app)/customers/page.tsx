@@ -1,7 +1,6 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { apiFetch } from '@/lib/api';
@@ -20,6 +19,7 @@ import {
   Input,
   Modal,
   PageHeader,
+  SearchInput,
   Select,
 } from '@/components/ui';
 
@@ -167,19 +167,13 @@ export default function CustomersPage(): JSX.Element {
       />
 
       <Card className="p-4">
-        <div className="relative mb-3 max-w-sm">
-          <Search
-            size={16}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
-          />
-          <Input
-            aria-label="Buscar clientes"
-            className="pl-9"
-            placeholder="Buscar por nome, documento, e-mail, telefone…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+        <SearchInput
+          className="mb-3"
+          aria-label="Buscar clientes"
+          placeholder="Buscar por nome, documento, e-mail, telefone…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
 
         <DataTable
           query={query}

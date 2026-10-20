@@ -3,24 +3,30 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { apiFetch, buildQuery } from '@/lib/api';
 import type { Paginated } from '@/lib/types';
 import { Button, EmptyState, QueryError, Spinner, cn } from './ui';
 
 type QueryParams = Record<string, string | number | boolean | undefined | null>;
 
+/** O que o `DataTable` precisa de uma consulta paginada. */
+export type PagedQuery<T> = Pick<
+  UseQueryResult<Paginated<T>>,
+  'data' | 'error' | 'isError' | 'isFetching' | 'isLoading' | 'refetch'
+>;
+
 /**
  * Lista paginada no servidor. A página volta para 1 sempre que os filtros mudam,
  * e a página anterior continua visível enquanto a próxima carrega.
  */
-export function usePagedQuery<T>(
+export function usePagedQuery<T, R extends Paginated<T> = Paginated<T>>(
   key: string,
   path: string,
   params: QueryParams = {},
   pageSize = 20,
 ): {
-  query: UseQueryResult<Paginated<T>>;
+  query: UseQueryResult<R>;
   page: number;
   setPage: (page: number) => void;
 } {
@@ -30,11 +36,52 @@ export function usePagedQuery<T>(
 
   const query = useQuery({
     queryKey: [key, params, page, pageSize],
-    queryFn: () => apiFetch<Paginated<T>>(`${path}${buildQuery({ ...params, page, pageSize })}`),
+    queryFn: () => apiFetch<R>(`${path}${buildQuery({ ...params, page, pageSize })}`),
     placeholderData: keepPreviousData,
   });
 
   return { query, page, setPage: (next) => setState({ filtersKey, page: next }) };
+}
+
+/**
+ * Paginação no cliente para endpoints que devolvem a lista inteira (filiais, papéis,
+ * saldos). Mantém o mesmo contrato do `usePagedQuery`.
+ */
+export function useLocalPaged<T>(
+  source: UseQueryResult<T[]>,
+  pageSize = 20,
+): { query: PagedQuery<T>; page: number; setPage: (page: number) => void } {
+  const [requested, setPage] = useState(1);
+  const all = source.data;
+  const totalPages = all ? Math.max(1, Math.ceil(all.length / pageSize)) : 1;
+  const page = Math.min(requested, totalPages);
+
+  const data = useMemo<Paginated<T> | undefined>(
+    () =>
+      all
+        ? {
+            items: all.slice((page - 1) * pageSize, page * pageSize),
+            total: all.length,
+            page,
+            pageSize,
+            totalPages,
+          }
+        : undefined,
+    [all, page, pageSize, totalPages],
+  );
+
+  return {
+    query: {
+      data,
+      error: source.error,
+      isError: source.isError,
+      isFetching: source.isFetching,
+      isLoading: source.isLoading,
+      refetch: source.refetch as unknown as PagedQuery<T>['refetch'],
+    },
+    page,
+    setPage,
+  };
 }
 
 export interface Column<T> {
@@ -100,7 +147,7 @@ export function DataTable<T>({
   emptyMessage = 'Nenhum registro encontrado.',
   emptyAction,
 }: {
-  query: UseQueryResult<Paginated<T>>;
+  query: PagedQuery<T>;
   columns: Column<T>[];
   rowKey: (row: T) => string;
   page: number;

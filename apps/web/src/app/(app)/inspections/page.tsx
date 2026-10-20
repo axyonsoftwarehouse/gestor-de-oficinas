@@ -4,29 +4,65 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { apiFetch, buildQuery } from '@/lib/api';
-import type { Inspection, InspectionTemplate, Paginated } from '@/lib/types';
-import { useBranches, useVehicles } from '@/lib/queries';
 import { formatDateTime } from '@/lib/format';
+import { INSPECTION_STATUS, enumOptions } from '@/lib/labels';
+import { hasPermission } from '@/lib/permissions';
+import { useBranches, useVehicles } from '@/lib/queries';
+import type { Inspection, InspectionTemplate, Paginated } from '@/lib/types';
+import { useAuth } from '@/components/auth-provider';
+import { DataTable, usePagedQuery, type Column } from '@/components/data-table';
 import {
   Button,
   Card,
-  EmptyState,
   ErrorText,
   Field,
   Input,
   Modal,
   PageHeader,
   Select,
-  Spinner,
-  Td,
-  Th,
   StatusBadge,
 } from '@/components/ui';
-import { INSPECTION_STATUS } from '@/lib/labels';
+
+const COLUMNS: Column<Inspection>[] = [
+  {
+    key: 'vehicle',
+    header: 'Veículo',
+    cell: (inspection) => (
+      <div>
+        <div className="font-mono text-xs font-medium uppercase">
+          {inspection.vehicle?.plate ?? '-'}
+        </div>
+        <div className="text-xs text-ink-muted">
+          {[inspection.vehicle?.brand?.name, inspection.vehicle?.model?.name]
+            .filter(Boolean)
+            .join(' ')}
+        </div>
+      </div>
+    ),
+  },
+  { key: 'job', header: 'OS', cell: (inspection) => inspection.jobCard?.number ?? '-' },
+  {
+    key: 'status',
+    header: 'Status',
+    cell: (inspection) => <StatusBadge map={INSPECTION_STATUS} value={inspection.status} />,
+  },
+  {
+    key: 'started',
+    header: 'Iniciada',
+    cell: (inspection) => (
+      <span className="whitespace-nowrap">
+        {formatDateTime(inspection.startedAt ?? inspection.createdAt)}
+      </span>
+    ),
+  },
+];
 
 export default function InspectionsPage(): JSX.Element {
   const router = useRouter();
+  const { session } = useAuth();
+  const granted = session?.permissions ?? [];
   const [status, setStatus] = useState('');
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
@@ -47,10 +83,8 @@ export default function InspectionsPage(): JSX.Element {
       ),
   });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['inspections', status],
-    queryFn: () =>
-      apiFetch<Paginated<Inspection>>(`/inspections${buildQuery({ status, pageSize: 50 })}`),
+  const { query, page, setPage } = usePagedQuery<Inspection>('inspections', '/inspections', {
+    status,
   });
 
   const start = useMutation({
@@ -64,20 +98,27 @@ export default function InspectionsPage(): JSX.Element {
           notes: form.notes || undefined,
         }),
       }),
-    onSuccess: (inspection) => router.push(`/inspections/${inspection.id}`),
-    onError: (err) => setError(err instanceof Error ? err.message : 'Erro'),
+    onSuccess: (inspection) => {
+      toast.success('Inspeção iniciada');
+      router.push(`/inspections/${inspection.id}`);
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'Erro ao iniciar'),
   });
 
   function openCreate(): void {
     setError('');
     setForm({
       branchId: branches.data?.[0]?.id ?? '',
-      vehicleId: vehicles.data?.items[0]?.id ?? '',
+      vehicleId: '',
       templateId: templates.data?.items[0]?.id ?? '',
       notes: '',
     });
     setOpen(true);
   }
+
+  const canCreate = hasPermission(granted, 'inspection.create');
+  const canSave =
+    Boolean(form.branchId && form.vehicleId && form.templateId) && !start.isPending;
 
   return (
     <div>
@@ -85,59 +126,45 @@ export default function InspectionsPage(): JSX.Element {
         title="Inspeções"
         subtitle="Execução de checklists de entrada"
         actions={
-          <div className="flex gap-2">
+          <>
             <Link href="/inspection-templates">
               <Button variant="secondary">Checklists</Button>
             </Link>
-            <Button onClick={openCreate}>Nova inspeção</Button>
-          </div>
+            {canCreate ? <Button onClick={openCreate}>Nova inspeção</Button> : null}
+          </>
         }
       />
 
       <Card className="p-4">
-        <div className="mb-3 max-w-xs">
-          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+        <div className="mb-3 w-full sm:max-w-xs">
+          <Select
+            aria-label="Filtrar por status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
             <option value="">Todos os status</option>
-            <option value="IN_PROGRESS">Em andamento</option>
-            <option value="COMPLETED">Concluída</option>
-            <option value="CANCELLED">Cancelada</option>
+            {enumOptions(INSPECTION_STATUS).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </Select>
         </div>
 
-        {isLoading ? (
-          <Spinner />
-        ) : !data || data.items.length === 0 ? (
-          <EmptyState message="Nenhuma inspeção encontrada." />
-        ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <Th>Veículo</Th>
-                <Th>OS</Th>
-                <Th>Status</Th>
-                <Th>Iniciada</Th>
-                <Th />
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((inspection) => (
-                <tr key={inspection.id} className="border-b border-slate-100">
-                  <Td>{inspection.vehicle?.plate ?? '-'}</Td>
-                  <Td>{inspection.jobCard?.number ?? '-'}</Td>
-                  <Td>
-                    <StatusBadge map={INSPECTION_STATUS} value={inspection.status} />
-                  </Td>
-                  <Td>{formatDateTime(inspection.startedAt ?? inspection.createdAt)}</Td>
-                  <Td className="text-right">
-                    <Link href={`/inspections/${inspection.id}`} className="text-sm underline">
-                      Abrir
-                    </Link>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <DataTable
+          query={query}
+          columns={COLUMNS}
+          rowKey={(inspection) => inspection.id}
+          page={page}
+          onPageChange={setPage}
+          onRowClick={(inspection) => router.push(`/inspections/${inspection.id}`)}
+          emptyMessage={status ? 'Nenhuma inspeção com esse status.' : 'Nenhuma inspeção ainda.'}
+          emptyAction={
+            !status && canCreate ? (
+              <Button onClick={openCreate}>Iniciar a primeira inspeção</Button>
+            ) : undefined
+          }
+        />
       </Card>
 
       <Modal
@@ -149,65 +176,73 @@ export default function InspectionsPage(): JSX.Element {
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button
-              onClick={() => start.mutate()}
-              disabled={
-                start.isPending || !form.branchId || !form.vehicleId || !form.templateId
-              }
-            >
+            <Button type="submit" form="inspection-form" disabled={!canSave}>
               {start.isPending ? 'Iniciando…' : 'Iniciar inspeção'}
             </Button>
           </>
         }
       >
-        <ErrorText>{error}</ErrorText>
-        <Field label="Checklist">
-          <Select
-            value={form.templateId}
-            onChange={(e) => setForm((p) => ({ ...p, templateId: e.target.value }))}
-          >
-            <option value="">Selecione…</option>
-            {templates.data?.items.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Filial">
-            <Select
-              value={form.branchId}
-              onChange={(e) => setForm((p) => ({ ...p, branchId: e.target.value }))}
-            >
-              <option value="">Selecione…</option>
-              {branches.data?.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Veículo">
-            <Select
-              value={form.vehicleId}
-              onChange={(e) => setForm((p) => ({ ...p, vehicleId: e.target.value }))}
-            >
-              <option value="">Selecione…</option>
-              {vehicles.data?.items.map((vehicle) => (
-                <option key={vehicle.id} value={vehicle.id}>
-                  {vehicle.plate ?? vehicle.id.slice(0, 8)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </div>
-        <Field label="Observações">
-          <Input
-            value={form.notes}
-            onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-          />
-        </Field>
+        <form
+          id="inspection-form"
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (canSave) start.mutate();
+          }}
+        >
+          <ErrorText>{error}</ErrorText>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Checklist">
+              <Select
+                required
+                value={form.templateId}
+                onChange={(e) => setForm((p) => ({ ...p, templateId: e.target.value }))}
+              >
+                <option value="">Selecione…</option>
+                {templates.data?.items.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Filial">
+              <Select
+                required
+                value={form.branchId}
+                onChange={(e) => setForm((p) => ({ ...p, branchId: e.target.value }))}
+              >
+                <option value="">Selecione…</option>
+                {branches.data?.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Veículo">
+              <Select
+                required
+                value={form.vehicleId}
+                onChange={(e) => setForm((p) => ({ ...p, vehicleId: e.target.value }))}
+              >
+                <option value="">Selecione…</option>
+                {vehicles.data?.items.map((vehicle) => (
+                  <option key={vehicle.id} value={vehicle.id}>
+                    {vehicle.plate ?? vehicle.id.slice(0, 8)}
+                    {vehicle.customer ? ` — ${vehicle.customer.name}` : ''}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Observações">
+              <Input
+                value={form.notes}
+                onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+              />
+            </Field>
+          </div>
+        </form>
       </Modal>
     </div>
   );

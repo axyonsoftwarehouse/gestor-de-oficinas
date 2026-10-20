@@ -1,7 +1,7 @@
 'use client';
 
 import * as Dialog from '@radix-ui/react-dialog';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, Search, X } from 'lucide-react';
 import {
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
@@ -50,6 +50,22 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>): JSX.Element
         props.className,
       )}
     />
+  );
+}
+
+/** Campo de busca com ícone, usado no topo das listas. */
+export function SearchInput({
+  className,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement>): JSX.Element {
+  return (
+    <div className={cn('relative w-full sm:max-w-sm', className)}>
+      <Search
+        size={16}
+        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
+      />
+      <Input type="search" {...props} className="pl-9" />
+    </div>
   );
 }
 
