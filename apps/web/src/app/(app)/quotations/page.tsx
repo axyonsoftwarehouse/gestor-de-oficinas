@@ -8,7 +8,6 @@ import type { JobCard, Paginated, Quotation } from '@/lib/types';
 import { formatMoney } from '@/lib/format';
 import { useBranches, useCustomers } from '@/lib/queries';
 import {
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -21,7 +20,9 @@ import {
   Spinner,
   Td,
   Th,
+  StatusBadge,
 } from '@/components/ui';
+import { QUOTATION_STATUS } from '@/lib/labels';
 
 interface QuotationForm {
   branchId: string;
@@ -142,7 +143,7 @@ export default function QuotationsPage(): JSX.Element {
                   <Td>{quotation.number}</Td>
                   <Td>{quotation.customer?.name ?? '-'}</Td>
                   <Td>{quotation.jobCard?.number ?? '-'}</Td>
-                  <Td><Badge>{quotation.status}</Badge></Td>
+                  <Td><StatusBadge map={QUOTATION_STATUS} value={quotation.status} /></Td>
                   <Td className="text-right">{formatMoney(quotation.total)}</Td>
                   <Td className="text-right">
                     <Link href={`/quotations/${quotation.id}`} className="text-sm underline">

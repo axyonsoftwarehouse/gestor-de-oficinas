@@ -7,7 +7,6 @@ import type { Paginated, Part, Purchase, StockLocation, Supplier } from '@/lib/t
 import { useBranches } from '@/lib/queries';
 import { formatDate, formatMoney } from '@/lib/format';
 import {
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -20,7 +19,10 @@ import {
   Spinner,
   Td,
   Th,
+  StatusBadge,
 } from '@/components/ui';
+import { useConfirm } from '@/components/confirm';
+import { PURCHASE_STATUS } from '@/lib/labels';
 
 interface ItemRow {
   partId: string;
@@ -29,6 +31,7 @@ interface ItemRow {
 }
 
 export default function PurchasesPage(): JSX.Element {
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
@@ -147,15 +150,15 @@ export default function PurchasesPage(): JSX.Element {
                   <Td>{purchase.number}</Td>
                   <Td>{formatDate(purchase.purchaseDate)}</Td>
                   <Td>{purchase.supplier?.name ?? '-'}</Td>
-                  <Td><Badge tone={purchase.status === 'CANCELLED' ? 'red' : 'green'}>{purchase.status}</Badge></Td>
+                  <Td><StatusBadge map={PURCHASE_STATUS} value={purchase.status} /></Td>
                   <Td className="text-right">{formatMoney(purchase.total)}</Td>
                   <Td className="text-right">
                     {purchase.status !== 'CANCELLED' ? (
                       <Button
                         variant="danger"
                         disabled={cancel.isPending}
-                        onClick={() => {
-                          if (window.confirm(`Cancelar a compra ${purchase.number}?`)) {
+                        onClick={async () => {
+                          if (await confirm({ title: `Cancelar a compra ${purchase.number}?`, confirmLabel: 'Cancelar', tone: 'danger' })) {
                             cancel.mutate(purchase.id);
                           }
                         }}

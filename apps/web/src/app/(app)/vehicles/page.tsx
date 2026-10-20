@@ -19,6 +19,7 @@ import {
   Td,
   Th,
 } from '@/components/ui';
+import { useConfirm } from '@/components/confirm';
 
 interface VehicleForm {
   customerId: string;
@@ -37,6 +38,7 @@ const EMPTY: VehicleForm = {
 };
 
 export default function VehiclesPage(): JSX.Element {
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
@@ -156,8 +158,8 @@ export default function VehiclesPage(): JSX.Element {
                         </Button>
                         <Button
                           variant="danger"
-                          onClick={() => {
-                            if (window.confirm('Excluir veículo?')) remove.mutate(vehicle.id);
+                          onClick={async () => {
+                            if (await confirm({ title: 'Excluir veículo?', confirmLabel: 'Excluir', tone: 'danger' })) remove.mutate(vehicle.id);
                           }}
                         >
                           Excluir

@@ -2,7 +2,9 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
+import { Toaster } from 'sonner';
 import { AuthProvider } from './auth-provider';
+import { ConfirmProvider } from './confirm';
 
 export function Providers({ children }: { children: ReactNode }): JSX.Element {
   const [client] = useState(
@@ -16,7 +18,15 @@ export function Providers({ children }: { children: ReactNode }): JSX.Element {
 
   return (
     <QueryClientProvider client={client}>
-      <AuthProvider>{children}</AuthProvider>
+      <AuthProvider>
+        <ConfirmProvider>{children}</ConfirmProvider>
+      </AuthProvider>
+      <Toaster
+        position="bottom-right"
+        richColors
+        closeButton
+        toastOptions={{ className: 'font-sans' }}
+      />
     </QueryClientProvider>
   );
 }

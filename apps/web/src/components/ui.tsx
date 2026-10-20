@@ -1,5 +1,7 @@
 'use client';
 
+import * as Dialog from '@radix-ui/react-dialog';
+import { AlertTriangle, X } from 'lucide-react';
 import {
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
@@ -7,6 +9,7 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react';
+import { enumLabel, enumTone, type Tone } from '@/lib/labels';
 
 export function cn(...values: Array<string | false | null | undefined>): string {
   return values.filter(Boolean).join(' ');
@@ -116,7 +119,7 @@ export function Badge({
   tone = 'slate',
 }: {
   children: ReactNode;
-  tone?: 'slate' | 'green' | 'amber' | 'red' | 'blue';
+  tone?: Tone;
 }): JSX.Element {
   const tones = {
     slate: 'bg-surface-page text-ink-muted',
@@ -147,12 +150,12 @@ export function PageHeader({
   actions?: ReactNode;
 }): JSX.Element {
   return (
-    <div className="mb-6 flex items-start justify-between gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">{title}</h1>
+    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      <div className="min-w-0">
+        <h1 className="text-xl font-semibold tracking-tight text-ink sm:text-2xl">{title}</h1>
         {subtitle ? <p className="mt-1 text-sm text-ink-muted">{subtitle}</p> : null}
       </div>
-      {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   );
 }
@@ -161,37 +164,57 @@ export function Modal({
   open,
   onClose,
   title,
+  description,
   children,
   footer,
+  size = 'md',
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
+  description?: string;
   children: ReactNode;
   footer?: ReactNode;
-}): JSX.Element | null {
-  if (!open) return null;
+  size?: 'sm' | 'md' | 'lg';
+}): JSX.Element {
+  const widths = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-3xl' } as const;
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 p-4 backdrop-blur-sm">
-      <div className="mt-16 w-full max-w-lg rounded-xl bg-surface shadow-pop">
-        <div className="flex items-center justify-between border-b border-surface-line px-5 py-3.5">
-          <h2 className="text-sm font-semibold text-ink">{title}</h2>
-          <button
-            onClick={onClose}
-            className="text-ink-soft transition hover:text-ink"
-            aria-label="Fechar"
-          >
-            ✕
-          </button>
-        </div>
-        <div className="space-y-4 px-5 py-4">{children}</div>
-        {footer ? (
-          <div className="flex justify-end gap-2 border-t border-surface-line px-5 py-3.5">
-            {footer}
+    <Dialog.Root open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-ink-strong/40 backdrop-blur-sm data-[state=open]:animate-fade-in" />
+        <Dialog.Content
+          className={cn(
+            'fixed left-1/2 top-[8vh] z-50 flex max-h-[84vh] w-[calc(100%-2rem)] -translate-x-1/2 flex-col rounded-xl bg-surface shadow-pop outline-none data-[state=open]:animate-pop-in',
+            widths[size],
+          )}
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-surface-line px-5 py-3.5">
+            <div>
+              <Dialog.Title className="text-sm font-semibold text-ink">{title}</Dialog.Title>
+              {description ? (
+                <Dialog.Description className="mt-0.5 text-xs text-ink-muted">
+                  {description}
+                </Dialog.Description>
+              ) : (
+                <Dialog.Description className="sr-only">{title}</Dialog.Description>
+              )}
+            </div>
+            <Dialog.Close
+              className="-mr-1 rounded-md p-1 text-ink-soft transition hover:bg-surface-page hover:text-ink"
+              aria-label="Fechar"
+            >
+              <X size={16} />
+            </Dialog.Close>
           </div>
-        ) : null}
-      </div>
-    </div>
+          <div className="space-y-4 overflow-y-auto px-5 py-4">{children}</div>
+          {footer ? (
+            <div className="flex justify-end gap-2 border-t border-surface-line px-5 py-3.5">
+              {footer}
+            </div>
+          ) : null}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
@@ -200,12 +223,58 @@ export function ErrorText({ children }: { children: ReactNode }): JSX.Element | 
   return <p className="text-sm text-state-danger">{children}</p>;
 }
 
-export function EmptyState({ message }: { message: string }): JSX.Element {
+export function EmptyState({
+  message,
+  action,
+}: {
+  message: string;
+  action?: ReactNode;
+}): JSX.Element {
   return (
-    <div className="rounded-xl border border-dashed border-surface-line bg-surface-soft p-8 text-center text-sm text-ink-muted">
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-surface-line bg-surface-soft p-8 text-center text-sm text-ink-muted">
       {message}
+      {action}
     </div>
   );
+}
+
+/** Estado de erro de uma consulta: nunca exibir lista vazia quando a API falhou. */
+export function QueryError({
+  error,
+  onRetry,
+}: {
+  error: unknown;
+  onRetry?: () => void;
+}): JSX.Element {
+  const message = error instanceof Error ? error.message : 'Erro ao carregar os dados.';
+  return (
+    <div
+      role="alert"
+      className="flex flex-col items-center gap-3 rounded-xl border border-state-danger/30 bg-state-danger/5 p-8 text-center text-sm"
+    >
+      <AlertTriangle size={20} className="text-state-danger" />
+      <div>
+        <div className="font-medium text-ink">Não foi possível carregar os dados</div>
+        <div className="mt-1 text-ink-muted">{message}</div>
+      </div>
+      {onRetry ? (
+        <Button variant="secondary" onClick={onRetry}>
+          Tentar novamente
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+/** Badge com rótulo PT-BR e tom vindos de `lib/labels`. */
+export function StatusBadge({
+  map,
+  value,
+}: {
+  map: Parameters<typeof enumLabel>[0];
+  value: string | null | undefined;
+}): JSX.Element {
+  return <Badge tone={enumTone(map, value)}>{enumLabel(map, value)}</Badge>;
 }
 
 export function Spinner(): JSX.Element {

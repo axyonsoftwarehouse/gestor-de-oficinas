@@ -20,6 +20,7 @@ import {
   Th,
   Textarea,
 } from '@/components/ui';
+import { useConfirm } from '@/components/confirm';
 
 interface ServiceForm {
   name: string;
@@ -40,6 +41,7 @@ const EMPTY: ServiceForm = {
 };
 
 export default function ServicesPage(): JSX.Element {
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
@@ -161,8 +163,8 @@ export default function ServicesPage(): JSX.Element {
                         </Button>
                         <Button
                           variant="danger"
-                          onClick={() => {
-                            if (window.confirm(`Excluir ${service.name}?`)) {
+                          onClick={async () => {
+                            if (await confirm({ title: `Excluir ${service.name}?`, confirmLabel: 'Excluir', tone: 'danger' })) {
                               remove.mutate(service.id);
                             }
                           }}

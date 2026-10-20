@@ -16,7 +16,9 @@ import {
   PageHeader,
   Select,
   Spinner,
+  StatusBadge,
 } from '@/components/ui';
+import { INSPECTION_STATUS } from '@/lib/labels';
 
 const RESULTS: { value: InspectionResult; label: string; active: string }[] = [
   { value: 'OK', label: 'OK', active: 'bg-emerald-600 text-white' },
@@ -199,9 +201,7 @@ export default function InspectionDetailPage(): JSX.Element {
         }
         actions={
           <div className="flex items-center gap-2">
-            <Badge tone={data.status === 'COMPLETED' ? 'green' : 'blue'}>
-              {data.status}
-            </Badge>
+            <StatusBadge map={INSPECTION_STATUS} value={data.status} />
             {data.status !== 'COMPLETED' ? (
               <Button onClick={() => complete.mutate()} disabled={complete.isPending}>
                 Concluir

@@ -8,7 +8,6 @@ import { useServices } from '@/lib/queries';
 import type { JobCard, JobStatus, Paginated, TeamMember } from '@/lib/types';
 import { formatMoney } from '@/lib/format';
 import {
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -20,7 +19,9 @@ import {
   Spinner,
   Td,
   Th,
+  StatusBadge,
 } from '@/components/ui';
+import { JOB_STATUS, LINE_TYPE, enumLabel } from '@/lib/labels';
 
 const TRANSITIONS: Record<JobStatus, JobStatus[]> = {
   DRAFT: ['SCHEDULED', 'CHECKED_IN', 'CANCELLED'],
@@ -155,7 +156,7 @@ export default function JobCardDetailPage(): JSX.Element {
       <PageHeader
         title={`OS ${data.number}`}
         subtitle={`${data.customer?.name ?? ''} · ${data.vehicle?.plate ?? ''}`}
-        actions={<Badge tone="blue">{data.status}</Badge>}
+        actions={<StatusBadge map={JOB_STATUS} value={data.status} />}
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -184,7 +185,7 @@ export default function JobCardDetailPage(): JSX.Element {
               <tbody>
                 {data.lines.map((item) => (
                   <tr key={item.id} className="border-b border-slate-100">
-                    <Td>{item.type}</Td>
+                    <Td>{enumLabel(LINE_TYPE, item.type)}</Td>
                     <Td>{item.description ?? '-'}</Td>
                     <Td className="text-right">{String(item.quantity)}</Td>
                     <Td className="text-right">{formatMoney(item.unitPrice)}</Td>
@@ -274,7 +275,7 @@ export default function JobCardDetailPage(): JSX.Element {
                   onClick={() => transition.mutate(status)}
                   disabled={transition.isPending}
                 >
-                  {status}
+                  {enumLabel(JOB_STATUS, status)}
                 </Button>
               ))
             )}
@@ -341,7 +342,7 @@ export default function JobCardDetailPage(): JSX.Element {
           <ul className="mt-2 space-y-1 text-xs text-slate-500">
             {data.statusHistory?.map((entry) => (
               <li key={entry.id}>
-                {entry.toStatus} · {new Date(entry.changedAt).toLocaleString('pt-BR')}
+                {enumLabel(JOB_STATUS, entry.toStatus)} · {new Date(entry.changedAt).toLocaleString('pt-BR')}
               </li>
             ))}
           </ul>

@@ -9,7 +9,6 @@ import type { Inspection, InspectionTemplate, Paginated } from '@/lib/types';
 import { useBranches, useVehicles } from '@/lib/queries';
 import { formatDateTime } from '@/lib/format';
 import {
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -22,14 +21,9 @@ import {
   Spinner,
   Td,
   Th,
+  StatusBadge,
 } from '@/components/ui';
-
-function tone(status: string): 'slate' | 'green' | 'amber' | 'blue' {
-  if (status === 'COMPLETED') return 'green';
-  if (status === 'IN_PROGRESS') return 'blue';
-  if (status === 'CANCELLED') return 'amber';
-  return 'slate';
-}
+import { INSPECTION_STATUS } from '@/lib/labels';
 
 export default function InspectionsPage(): JSX.Element {
   const router = useRouter();
@@ -131,7 +125,7 @@ export default function InspectionsPage(): JSX.Element {
                   <Td>{inspection.vehicle?.plate ?? '-'}</Td>
                   <Td>{inspection.jobCard?.number ?? '-'}</Td>
                   <Td>
-                    <Badge tone={tone(inspection.status)}>{inspection.status}</Badge>
+                    <StatusBadge map={INSPECTION_STATUS} value={inspection.status} />
                   </Td>
                   <Td>{formatDateTime(inspection.startedAt ?? inspection.createdAt)}</Td>
                   <Td className="text-right">

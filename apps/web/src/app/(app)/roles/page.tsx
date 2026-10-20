@@ -18,6 +18,7 @@ import {
   Td,
   Th,
 } from '@/components/ui';
+import { useConfirm } from '@/components/confirm';
 
 const ACTION_LABELS: Record<string, string> = {
   view: 'Ver',
@@ -29,6 +30,7 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 export default function RolesPage(): JSX.Element {
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Role | null>(null);
@@ -140,8 +142,8 @@ export default function RolesPage(): JSX.Element {
                       {!role.isSystem ? (
                         <Button
                           variant="danger"
-                          onClick={() => {
-                            if (window.confirm(`Excluir ${role.name}?`)) remove.mutate(role.id);
+                          onClick={async () => {
+                            if (await confirm({ title: `Excluir ${role.name}?`, confirmLabel: 'Excluir', tone: 'danger' })) remove.mutate(role.id);
                           }}
                         >
                           Excluir

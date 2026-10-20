@@ -7,7 +7,6 @@ import { apiFetch, buildQuery } from '@/lib/api';
 import type { Invoice, Paginated } from '@/lib/types';
 import { formatMoney } from '@/lib/format';
 import {
-  Badge,
   Card,
   EmptyState,
   PageHeader,
@@ -15,14 +14,9 @@ import {
   Spinner,
   Td,
   Th,
+  StatusBadge,
 } from '@/components/ui';
-
-function tone(status: string): 'slate' | 'green' | 'amber' | 'red' {
-  if (status === 'PAID') return 'green';
-  if (status === 'PARTIALLY_PAID') return 'amber';
-  if (status === 'CANCELLED') return 'red';
-  return 'slate';
-}
+import { INVOICE_STATUS } from '@/lib/labels';
 
 export default function InvoicesPage(): JSX.Element {
   const [status, setStatus] = useState('');
@@ -69,7 +63,7 @@ export default function InvoicesPage(): JSX.Element {
                 <tr key={invoice.id} className="border-b border-slate-100">
                   <Td>{invoice.number}</Td>
                   <Td>{invoice.customer?.name ?? '-'}</Td>
-                  <Td><Badge tone={tone(invoice.status)}>{invoice.status}</Badge></Td>
+                  <Td><StatusBadge map={INVOICE_STATUS} value={invoice.status} /></Td>
                   <Td className="text-right">{formatMoney(invoice.total)}</Td>
                   <Td className="text-right">{formatMoney(invoice.amountPaid)}</Td>
                   <Td className="text-right">

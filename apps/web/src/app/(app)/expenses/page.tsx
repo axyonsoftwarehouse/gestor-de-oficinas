@@ -21,6 +21,7 @@ import {
   Th,
   Textarea,
 } from '@/components/ui';
+import { useConfirm } from '@/components/confirm';
 
 interface ExpenseForm {
   branchId: string;
@@ -41,6 +42,7 @@ function emptyForm(branchId: string): ExpenseForm {
 }
 
 export default function ExpensesPage(): JSX.Element {
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const { data: branches } = useBranches();
 
@@ -196,8 +198,8 @@ export default function ExpensesPage(): JSX.Element {
                         </Button>
                         <Button
                           variant="danger"
-                          onClick={() => {
-                            if (window.confirm('Excluir esta despesa?')) {
+                          onClick={async () => {
+                            if (await confirm({ title: 'Excluir esta despesa?', confirmLabel: 'Excluir', tone: 'danger' })) {
                               remove.mutate(expense.id);
                             }
                           }}

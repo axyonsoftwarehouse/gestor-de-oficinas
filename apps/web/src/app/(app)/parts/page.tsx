@@ -18,6 +18,7 @@ import {
   Td,
   Th,
 } from '@/components/ui';
+import { useConfirm } from '@/components/confirm';
 
 interface PartForm {
   name: string;
@@ -30,6 +31,7 @@ interface PartForm {
 const EMPTY: PartForm = { name: '', sku: '', costPrice: '', salePrice: '', minStock: '' };
 
 export default function PartsPage(): JSX.Element {
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
@@ -136,8 +138,8 @@ export default function PartsPage(): JSX.Element {
                       <Button variant="secondary" onClick={() => openEdit(part)}>Editar</Button>
                       <Button
                         variant="danger"
-                        onClick={() => {
-                          if (window.confirm('Excluir peça?')) remove.mutate(part.id);
+                        onClick={async () => {
+                          if (await confirm({ title: 'Excluir peça?', confirmLabel: 'Excluir', tone: 'danger' })) remove.mutate(part.id);
                         }}
                       >
                         Excluir

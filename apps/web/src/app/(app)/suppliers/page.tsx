@@ -18,6 +18,7 @@ import {
   Th,
   Textarea,
 } from '@/components/ui';
+import { useConfirm } from '@/components/confirm';
 
 interface SupplierForm {
   name: string;
@@ -36,6 +37,7 @@ const EMPTY: SupplierForm = {
 };
 
 export default function SuppliersPage(): JSX.Element {
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
@@ -141,8 +143,8 @@ export default function SuppliersPage(): JSX.Element {
                         </Button>
                         <Button
                           variant="danger"
-                          onClick={() => {
-                            if (window.confirm(`Excluir ${supplier.name}?`)) {
+                          onClick={async () => {
+                            if (await confirm({ title: `Excluir ${supplier.name}?`, confirmLabel: 'Excluir', tone: 'danger' })) {
                               remove.mutate(supplier.id);
                             }
                           }}

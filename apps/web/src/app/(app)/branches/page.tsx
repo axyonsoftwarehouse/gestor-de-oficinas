@@ -17,8 +17,10 @@ import {
   Td,
   Th,
 } from '@/components/ui';
+import { useConfirm } from '@/components/confirm';
 
 export default function BranchesPage(): JSX.Element {
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<BranchFull | null>(null);
@@ -103,8 +105,8 @@ export default function BranchesPage(): JSX.Element {
                       </Button>
                       <Button
                         variant="danger"
-                        onClick={() => {
-                          if (window.confirm(`Excluir ${branch.name}?`)) remove.mutate(branch.id);
+                        onClick={async () => {
+                          if (await confirm({ title: `Excluir ${branch.name}?`, confirmLabel: 'Excluir', tone: 'danger' })) remove.mutate(branch.id);
                         }}
                       >
                         Excluir

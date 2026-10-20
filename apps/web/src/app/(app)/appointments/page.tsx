@@ -7,7 +7,6 @@ import type { Appointment, Paginated } from '@/lib/types';
 import { useBranches, useCustomers, useVehicles } from '@/lib/queries';
 import { formatDateTime } from '@/lib/format';
 import {
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -20,7 +19,9 @@ import {
   Spinner,
   Td,
   Th,
+  StatusBadge,
 } from '@/components/ui';
+import { APPOINTMENT_STATUS, JOB_TYPE, enumLabel } from '@/lib/labels';
 
 interface AppointmentForm {
   branchId: string;
@@ -148,8 +149,8 @@ export default function AppointmentsPage(): JSX.Element {
                     <Td>{formatDateTime(appointment.scheduledStart)}</Td>
                     <Td>{appointment.customer?.name ?? '-'}</Td>
                     <Td>{appointment.vehicle?.plate ?? '-'}</Td>
-                    <Td>{appointment.type}</Td>
-                    <Td><Badge>{appointment.status}</Badge></Td>
+                    <Td>{enumLabel(JOB_TYPE, appointment.type)}</Td>
+                    <Td><StatusBadge map={APPOINTMENT_STATUS} value={appointment.status} /></Td>
                     <Td className="text-right">
                       {appointment.status !== 'CANCELLED' &&
                       appointment.status !== 'COMPLETED' ? (

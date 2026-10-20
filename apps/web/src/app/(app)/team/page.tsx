@@ -20,6 +20,7 @@ import {
   Td,
   Th,
 } from '@/components/ui';
+import { useConfirm } from '@/components/confirm';
 
 interface MemberForm {
   name: string;
@@ -38,6 +39,7 @@ const EMPTY: MemberForm = {
 };
 
 export default function TeamPage(): JSX.Element {
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
@@ -184,8 +186,8 @@ export default function TeamPage(): JSX.Element {
                       {!member.isOwner && member.status === 'ACTIVE' ? (
                         <Button
                           variant="danger"
-                          onClick={() => {
-                            if (window.confirm(`Desativar ${member.user.name}?`))
+                          onClick={async () => {
+                            if (await confirm({ title: `Desativar ${member.user.name}?`, confirmLabel: 'Desativar', tone: 'danger' }))
                               deactivate.mutate(member.id);
                           }}
                         >

@@ -64,6 +64,19 @@ const config: Config = {
         xl: '0.75rem',
         '2xl': '1rem',
       },
+      keyframes: {
+        'fade-in': { from: { opacity: '0' }, to: { opacity: '1' } },
+        'pop-in': {
+          from: { opacity: '0', transform: 'translate(-50%, 6px) scale(0.98)' },
+          to: { opacity: '1', transform: 'translate(-50%, 0) scale(1)' },
+        },
+        'slide-in-left': { from: { transform: 'translateX(-100%)' }, to: { transform: 'translateX(0)' } },
+      },
+      animation: {
+        'fade-in': 'fade-in 150ms ease-out',
+        'pop-in': 'pop-in 150ms ease-out',
+        'slide-in-left': 'slide-in-left 200ms ease-out',
+      },
       boxShadow: {
         card: '0 1px 2px rgba(35, 49, 69, 0.04), 0 1px 3px rgba(35, 49, 69, 0.06)',
         pop: '0 12px 32px rgba(15, 20, 30, 0.28)',
