@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { applyVehicleCatalog } from '../src/vehicle-catalog';
 import { seedPermissions, seedTenantRoles } from './seed/permissions';
 
 const prisma = new PrismaClient();
@@ -97,6 +98,8 @@ async function seedDemoTenant(): Promise<void> {
   });
 
   await seedTenantRoles(prisma, tenant.id);
+
+  await applyVehicleCatalog(prisma, tenant.id);
 
   const paymentMethods = [
     ['Dinheiro', 'CASH'],

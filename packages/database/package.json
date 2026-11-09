@@ -18,6 +18,7 @@
     "db:app-role:direct": "prisma db execute --file prisma/app-role.sql --schema prisma/schema.prisma",
     "db:truncate:direct": "prisma db execute --file prisma/test-truncate.sql --schema prisma/schema.prisma",
     "db:seed": "pnpm --filter @gestor/shared build && dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "db:seed:vehicle-catalog": "pnpm --filter @gestor/shared build && dotenv -e ../../.env -- tsx prisma/seed-vehicle-catalog.ts",
     "db:seed:mock": "pnpm --filter @gestor/shared build && dotenv -e ../../.env -- tsx prisma/seed-mock.ts",
     "studio": "dotenv -e ../../.env -- prisma studio"
   },

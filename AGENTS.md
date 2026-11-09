@@ -32,6 +32,7 @@ pnpm --filter @gestor/database db:generate
 pnpm --filter @gestor/database db:deploy      # migrations (usa DIRECT_URL)
 pnpm db:rls                                   # políticas de RLS
 pnpm db:seed                                  # domínio demo (tenant/oficina)
+pnpm db:seed:vehicle-catalog                  # catálogo de marcas/modelos nas oficinas existentes
 pnpm --filter @gestor/web seed:owner          # owner via Better Auth
 pnpm --filter @gestor/web dev                 # Web/API -> http://localhost:3000
 ```
@@ -109,6 +110,12 @@ que recorta o menu. Ver `docs/app-mobile-pwa.md`.
 aprovação/recusa sem login, `AuditLog` da decisão e botão de envio por WhatsApp
 no app. Rotas em `app/api/public/**` e `POST /api/quotations/[id]/public-link`.
 
+**Catálogo de veículos**: marcas/modelos por oficina (`vehicle_brands` /
+`vehicle_models`), provisionados com o catálogo padrão de
+`packages/shared/src/vehicle-catalog.ts` e editáveis por
+`/api/vehicle-catalog/**`. Selects encadeados no cadastro do back-office e no
+app. `pnpm db:seed:vehicle-catalog` preenche oficinas antigas.
+
 **Qualidade**: `typecheck` e `next build` verdes; **RLS validada** no Neon;
 testes Vitest (`rls`, `flows`, `auth`).
 
@@ -121,14 +128,14 @@ remove do build qualquer variável não declarada).
 ## Backlog / próximos passos
 1. **Offline do PWA** (fila local de mutações) e, só depois de validado, o app
    **Expo + PowerSync** (offline real + inspeção com câmera).
-2. **Catálogo de modelos de veículo** exposto na API: o cadastro rápido do app
-   grava placa e ano, mas ainda não grava marca/modelo.
-3. **Serviço de PDF headless** (Playwright) consumindo `GET /api/invoices/:id/document`.
-4. **Anexos/notas** e **campos customizados** (schema existe, faltam API + UI).
-5. **Refino de UI** por tela (resumo de faturas, abas de settings, "Most Spent").
-6. **SaaS**: billing/planos, onboarding self-service, limites por plano.
-7. **Notificações** (e-mail/SMS) e lembretes de manutenção (agendados).
-8. **Impressão** de laudo/anexos e etiquetas QR/barcode.
+2. **Serviço de PDF headless** (Playwright) consumindo `GET /api/invoices/:id/document`.
+3. **Anexos/notas** e **campos customizados** (schema existe, faltam API + UI).
+4. **Refino de UI** por tela (resumo de faturas, abas de settings, "Most Spent").
+5. **SaaS**: billing/planos, onboarding self-service, limites por plano.
+6. **Notificações** (e-mail/SMS) e lembretes de manutenção (agendados).
+7. **Impressão** de laudo/anexos e etiquetas QR/barcode.
+8. **Placa como serviço**: preencher marca/modelo/ano automaticamente (hoje é
+   seleção manual no catálogo).
 9. **Backups offsite e rotação de segredos**: automação e runbook preparados;
    falta configurar bucket/secrets, rodar o primeiro backup e o drill de
    restauração (`docs/backups-e-rotacao.md`).

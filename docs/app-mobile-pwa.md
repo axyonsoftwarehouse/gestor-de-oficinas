@@ -119,15 +119,34 @@ O cliente aprova ou recusa sem criar conta e sem instalar nada.
 O middleware trata `/o/*` como público **sem** expulsar usuários logados (o dono
 pode abrir o próprio link).
 
+## Catálogo de veículos
+
+Marcas e modelos são **por oficina** (`vehicle_brands` / `vehicle_models`), com
+`tenant_id` e RLS como o resto do domínio.
+
+- **Provisionamento**: toda oficina nova nasce com o catálogo padrão de
+  `packages/shared/src/vehicle-catalog.ts` (23 marcas, ~160 modelos comuns no
+  Brasil).
+- **Oficinas existentes**: rodar uma vez `pnpm db:seed:vehicle-catalog`
+  (idempotente, percorre todos os tenants).
+- **API**: `GET /api/vehicle-catalog/brands`, `GET /api/vehicle-catalog/models?brandId=`,
+  e `POST` nos dois para criar marca/modelo próprios.
+- **UI**: `VehicleCatalogFields` (componente compartilhado) usa dois selects
+  encadeados com criação na hora ("+ Nova marca…"). Está no cadastro de veículo
+  do back-office e no cadastro rápido do app.
+
+O seed só preenche o que falta: se a oficina renomeou ou desativou algo, a
+execução seguinte não mexe.
+
 ## O que ainda falta (em ordem)
 
 1. **Offline de verdade**: fila local de mutações no PWA; depois PowerSync + Expo.
-2. **Catálogo de modelos de veículo** exposto na API: o cadastro rápido grava
-   placa e ano, sem marca/modelo.
-3. **Onboarding de primeira OS**: importar contatos do WhatsApp/caderno.
-4. **Impressão/etiqueta** e **lembrete de revisão** por WhatsApp.
-5. **Aprovação refletida na OS**: hoje o link aprova o orçamento; a OS continua
+2. **Onboarding de primeira OS**: importar contatos do WhatsApp/caderno.
+3. **Impressão/etiqueta** e **lembrete de revisão** por WhatsApp.
+4. **Aprovação refletida na OS**: hoje o link aprova o orçamento; a OS continua
    o fluxo normal no app.
+5. **Fipe/placa como serviço**: preencher marca/modelo/ano a partir da placa
+   (hoje é seleção manual).
 
 ## Como testar
 

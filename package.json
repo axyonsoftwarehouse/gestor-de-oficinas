@@ -19,6 +19,7 @@
     "db:deploy": "pnpm --filter @gestor/database db:deploy",
     "db:seed": "pnpm --filter @gestor/database db:seed && pnpm --filter @gestor/web seed:owner",
     "db:seed:owner": "pnpm --filter @gestor/web seed:owner",
+    "db:seed:vehicle-catalog": "pnpm --filter @gestor/database db:seed:vehicle-catalog",
     "db:seed:mock": "pnpm --filter @gestor/database db:seed:mock",
     "db:rls": "pnpm --filter @gestor/database db:rls",
     "db:backup": "node scripts/backup-db.mjs",

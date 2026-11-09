@@ -1,4 +1,5 @@
 import 'server-only';
+import { applyVehicleCatalog } from '@gestor/database';
 import {
   ROLE_TEMPLATES,
   listPermissionDefinitions,
@@ -66,6 +67,10 @@ export async function provisionTenant(
         const branch = await tx.branch.create({
           data: { tenantId: tenant.id, name: 'Matriz', code: 'MATRIZ' },
         });
+
+        // Catálogo inicial de marcas/modelos: a oficina já nasce podendo
+        // escolher o veículo no cadastro.
+        await applyVehicleCatalog(tx, tenant.id);
 
         let ownerRoleId: string | undefined;
         for (const template of ROLE_TEMPLATES) {

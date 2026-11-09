@@ -12,3 +12,4 @@ export {
   runWithTenant,
 } from './tenant-context';
 export type { TenantContext } from './tenant-context';
+export { applyVehicleCatalog } from './vehicle-catalog';

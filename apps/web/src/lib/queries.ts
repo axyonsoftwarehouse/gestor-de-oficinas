@@ -10,6 +10,34 @@ export interface Branch {
   code?: string | null;
 }
 
+export interface VehicleBrand {
+  id: string;
+  name: string;
+  _count?: { models: number };
+}
+
+export interface VehicleModel {
+  id: string;
+  name: string;
+  brandId: string;
+}
+
+export function useVehicleBrands() {
+  return useQuery({
+    queryKey: ['vehicle-catalog', 'brands'],
+    queryFn: () => apiFetch<VehicleBrand[]>('/vehicle-catalog/brands'),
+  });
+}
+
+export function useVehicleModels(brandId?: string) {
+  return useQuery({
+    queryKey: ['vehicle-catalog', 'models', brandId ?? ''],
+    queryFn: () =>
+      apiFetch<VehicleModel[]>(`/vehicle-catalog/models${buildQuery({ brandId })}`),
+    enabled: Boolean(brandId),
+  });
+}
+
 export function useBranches() {
   return useQuery({
     queryKey: ['branches'],
