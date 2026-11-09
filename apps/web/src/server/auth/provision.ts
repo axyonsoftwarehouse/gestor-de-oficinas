@@ -57,7 +57,7 @@ export async function provisionTenant(
         });
 
         const tenant = await tx.tenant.create({
-          data: { name: dto.tenantName, slug, status: 'ACTIVE', plan: 'trial' },
+          data: { name: dto.tenantName, slug, status: 'ACTIVE', plan: 'essencial' },
         });
 
         // Define o tenant corrente para o RLS permitir criar os registros.

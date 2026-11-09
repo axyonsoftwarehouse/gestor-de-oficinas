@@ -1,27 +1,55 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSessionCookie } from 'better-auth/cookies';
 
-const PUBLIC_PATHS = ['/login'];
+const PUBLIC_PATHS = ['/login', '/o'];
+/** Assets que precisam responder sem sessão (o navegador busca antes do login). */
+const PUBLIC_ASSETS = ['/manifest.webmanifest', '/icon.svg', '/favicon.ico'];
+const MOBILE_UA = /android|iphone|ipad|ipod|iemobile|opera mini|mobile/i;
+/** Cookie que mantém o usuário no site completo mesmo acessando pelo celular. */
+const VIEW_COOKIE = 'gestor_view';
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
+}
 
 /**
  * Protege as rotas privadas checando o cookie de sessão do Better Auth.
  * Só lê o cookie (Edge-safe); a validação real ocorre no servidor.
+ *
+ * No celular, a navegação começa no app (`/m`), que é o fluxo da oficina.
+ * `?desktop=1` grava um cookie e devolve o site completo (back-office).
  */
 export function middleware(request: NextRequest): NextResponse {
   // Ativa a proteção só quando o Better Auth estiver configurado.
-  // Enquanto o web não for readaptado (Fase 4), evita redirecionar tudo.
   if (!process.env.BETTER_AUTH_SECRET) {
     return NextResponse.next({ request });
   }
 
   const sessionCookie = getSessionCookie(request);
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
   const isApi = pathname.startsWith('/api');
-  const isPublic = PUBLIC_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
-  );
+  const isPublic = isPublicPath(pathname);
+  const isMobile = MOBILE_UA.test(request.headers.get('user-agent') ?? '');
+
+  if (PUBLIC_ASSETS.includes(pathname)) {
+    return NextResponse.next({ request });
+  }
 
   if (!isApi) {
+    // Pedido explícito pelo site completo (ou volta ao app).
+    const view = searchParams.get('desktop');
+    if (view === '1' || view === '0') {
+      const response = NextResponse.next({ request });
+      response.cookies.set(VIEW_COOKIE, view === '1' ? 'desktop' : 'mobile', {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 30,
+        sameSite: 'lax',
+      });
+      return response;
+    }
+
     if (!sessionCookie && !isPublic) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';
@@ -30,7 +58,21 @@ export function middleware(request: NextRequest): NextResponse {
     }
     if (sessionCookie && isPublic) {
       const url = request.nextUrl.clone();
-      url.pathname = '/dashboard';
+      url.pathname = isMobile ? '/m/hoje' : '/dashboard';
+      url.search = '';
+      return NextResponse.redirect(url);
+    }
+
+    const prefersDesktop = request.cookies.get(VIEW_COOKIE)?.value === 'desktop';
+    if (
+      sessionCookie &&
+      isMobile &&
+      !prefersDesktop &&
+      !pathname.startsWith('/m') &&
+      !pathname.startsWith('/o')
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/m/hoje';
       url.search = '';
       return NextResponse.redirect(url);
     }

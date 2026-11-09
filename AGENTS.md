@@ -57,7 +57,8 @@ Tipos: `pnpm typecheck`. Build: `pnpm --filter @gestor/web build`.
 
 Backup offsite (o Neon free não tem backup agendado): `scripts/backup-db.mjs` +
 `.github/workflows/backup.yml`; configuração, restauração e rotação de segredos
-em `docs/backups-e-rotacao.md`.
+em `docs/backups-e-rotacao.md`. O padrão free tier é 3 diários + 1 mensal; a cota
+de 10 GB do R2 é compartilhada entre projetos (ver §2.1 do runbook).
 
 ```
 pnpm db:backup                                  # dump cifrado em .backups/ (lê .env)
@@ -96,7 +97,13 @@ filiais, clientes, veículos, agendamentos, inspeções (templates versionados +
 execução/aprovação), job-cards (máquina de estados, linhas, mecânicos),
 orçamentos, faturas (pagamentos parciais + documento HTML), peças, estoque
 (ledger + saldos + issue-to-job), fornecedores, despesas, compras (entrada no
-ledger + despesa automática), relatórios, usuários, papéis/permissões. `GET /api/health`.
+ledger + despesa automática), relatórios, usuários, papéis/permissões e catálogo
+de serviços. `GET /api/health`.
+
+**App da oficina (PWA)** (`apps/web/src/app/(mobile)`): `/m/hoje`,
+`/m/os/nova`, `/m/os/[id]`, `/m/caixa` e `/m/caixa/[id]`; manifest em
+`app/manifest.ts`, detecção de celular no `middleware.ts` e plano `essencial`
+que recorta o menu. Ver `docs/app-mobile-pwa.md`.
 
 **Qualidade**: `typecheck` e `next build` verdes; **RLS validada** no Neon;
 testes Vitest (`rls`, `flows`, `auth`).
@@ -108,28 +115,35 @@ Obs.: `turbo.json` declara as envs em `globalEnv` (o `envMode: strict` do Turbo
 remove do build qualquer variável não declarada).
 
 ## Backlog / próximos passos
-1. **App mobile** do mecânico (Expo + **PowerSync**, offline-first).
-2. **Serviço de PDF headless** (Playwright) consumindo `GET /api/invoices/:id/document`.
-3. **Catálogo de Serviços** (modelo existe, sem API/tela), **anexos/notas** e
-   **campos customizados** (schema existe, faltam API + UI).
-4. **Refino de UI** por tela (resumo de faturas, abas de settings, "Most Spent").
-5. **SaaS**: billing/planos, onboarding self-service, limites por plano.
-6. **Notificações** (e-mail/SMS) e lembretes de manutenção (agendados).
-7. **Impressão** de laudo/anexos e etiquetas QR/barcode.
-8. **Backups offsite e rotação de segredos**: automação e runbook preparados;
-   falta configurar bucket/secrets, rodar o primeiro backup e o drill de
-   restauração (`docs/backups-e-rotacao.md`).
-9. Observabilidade/alertas e runbook de produção.
+1. **Link público do orçamento** (`/o/[token]`) com aprovar/recusar, enviado por
+   WhatsApp — fecha o ciclo de valor na primeira sessão.
+2. **Offline do PWA** (fila local de mutações) e, só depois de validado, o app
+   **Expo + PowerSync** (offline real + inspeção com câmera).
+3. **Catálogo de modelos de veículo** exposto na API: o cadastro rápido do app
+   grava placa e ano, mas ainda não grava marca/modelo.
+4. **Serviço de PDF headless** (Playwright) consumindo `GET /api/invoices/:id/document`.
+5. **Anexos/notas** e **campos customizados** (schema existe, faltam API + UI).
+6. **Refino de UI** por tela (resumo de faturas, abas de settings, "Most Spent").
+7. **SaaS**: billing/planos, onboarding self-service, limites por plano.
+8. **Notificações** (e-mail/SMS) e lembretes de manutenção (agendados).
+9. **Impressão** de laudo/anexos e etiquetas QR/barcode.
+10. **Backups offsite e rotação de segredos**: automação e runbook preparados;
+    falta configurar bucket/secrets, rodar o primeiro backup e o drill de
+    restauração (`docs/backups-e-rotacao.md`).
+11. Observabilidade/alertas e runbook de produção.
 
 ## Decisões de arquitetura (fechadas)
 Stack Node/TS; **Next.js full stack** (Route Handlers) + **Vercel**; Postgres
 (Neon) + Prisma; multi-tenant schema único + `tenant_id` + **RLS**; **Better Auth**;
 **PowerSync** para offline; **OS unificada**; inspeção **versionada** com gate de
 fatura por aprovação; impostos relacionais por linha; **estoque por ledger**; RBAC
-normalizado; PDF via serviço headless; monorepo pnpm+Turborepo.
+normalizado; PDF via serviço headless; monorepo pnpm+Turborepo; **PWA mobile
+primeiro** (`/m`) e Expo/PowerSync depois de validado; **plano `essencial`**
+recorta o menu (não as permissões).
 
 ## Documentos de referência
 - `docs/escopo-projeto-e-roadmap.md` — escopo (negócio + técnico) e roadmap.
+- `docs/app-mobile-pwa.md` — app da oficina (PWA), modo Essencial e próximos passos.
 - `docs/plano-migracao-neon-vercel.md` — execução da migração.
 - `docs/deploy-vercel.md` — runbook de deploy.
 - `docs/backups-e-rotacao.md` — backup offsite, restauração e rotação de segredos.

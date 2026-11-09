@@ -1,5 +1,6 @@
 'use client';
 
+import type { PlanId } from '@gestor/shared';
 import {
   createContext,
   useCallback,
@@ -12,7 +13,7 @@ import { authClient } from '@/lib/auth-client';
 
 export interface Session {
   user: { id: string; email: string; name: string };
-  tenant: { id: string; name: string; slug: string };
+  tenant: { id: string; name: string; slug: string; plan: PlanId };
   membershipId: string;
   permissions: string[];
 }
@@ -22,9 +23,16 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Relê `/api/me` (ex.: depois de trocar de plano). */
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+async function fetchSession(): Promise<Session | null> {
+  const response = await fetch('/api/me', { credentials: 'include' });
+  return response.ok ? ((await response.json()) as Session) : null;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }): JSX.Element {
   const { data: authSession, isPending } = authClient.useSession();
@@ -40,22 +48,29 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       return;
     }
     setLoading(true);
-    fetch('/api/me', { credentials: 'include' })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: Session | null) => {
-        if (!active) return;
-        setSession(data);
-        setLoading(false);
+    fetchSession()
+      .then((data) => {
+        if (active) setSession(data);
       })
       .catch(() => {
-        if (!active) return;
-        setSession(null);
-        setLoading(false);
+        if (active) setSession(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
     return () => {
       active = false;
     };
   }, [authSession, isPending]);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      setSession(await fetchSession());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const { error } = await authClient.signIn.email({ email, password });
@@ -69,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   }, []);
 
   return (
-    <AuthContext.Provider value={{ session, loading, login, logout }}>
+    <AuthContext.Provider value={{ session, loading, login, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );
