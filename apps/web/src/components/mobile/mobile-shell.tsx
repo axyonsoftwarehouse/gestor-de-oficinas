@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useAuth } from '@/components/auth-provider';
+import { OfflineIndicator } from '@/components/offline/offline-indicator';
 import { cn } from '@/components/ui';
 
 const TABS = [
@@ -79,6 +80,8 @@ export function MobileShell({ children }: { children: ReactNode }): JSX.Element 
           </button>
         </div>
       </header>
+
+      <OfflineIndicator />
 
       <main className="flex-1 px-4 pb-32 pt-4">{children}</main>
 

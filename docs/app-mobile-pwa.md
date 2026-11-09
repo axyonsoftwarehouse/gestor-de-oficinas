@@ -140,13 +140,14 @@ execução seguinte não mexe.
 
 ## O que ainda falta (em ordem)
 
-1. **Offline de verdade**: fila local de mutações no PWA; depois PowerSync + Expo.
-2. **Onboarding de primeira OS**: importar contatos do WhatsApp/caderno.
-3. **Impressão/etiqueta** e **lembrete de revisão** por WhatsApp.
-4. **Aprovação refletida na OS**: hoje o link aprova o orçamento; a OS continua
+1. **Onboarding de primeira OS**: importar contatos do WhatsApp/caderno.
+2. **Impressão/etiqueta** e **lembrete de revisão** por WhatsApp.
+3. **Aprovação refletida na OS**: hoje o link aprova o orçamento; a OS continua
    o fluxo normal no app.
-5. **Fipe/placa como serviço**: preencher marca/modelo/ano a partir da placa
+4. **Fipe/placa como serviço**: preencher marca/modelo/ano a partir da placa
    (hoje é seleção manual).
+5. **Offline real com fila persistente**: o PWA cobre "sem sinal por alguns
+   minutos" (ver `docs/pwa-offline.md`); o app Expo + PowerSync é o próximo passo.
 
 ## Como testar
 
