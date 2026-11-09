@@ -234,7 +234,8 @@ export async function removeQuotationLine(
 }
 
 export function sendQuotation(id: string) {
-  return changeQuotationStatus(id, 'SENT', ['DRAFT']);
+  // Reenvio é permitido: se já está SENT, apenas devolve o orçamento.
+  return changeQuotationStatus(id, 'SENT', ['DRAFT', 'SENT']);
 }
 
 export async function approveQuotation(id: string, userId: string) {

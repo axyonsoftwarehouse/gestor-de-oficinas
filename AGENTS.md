@@ -105,6 +105,10 @@ de serviços. `GET /api/health`.
 `app/manifest.ts`, detecção de celular no `middleware.ts` e plano `essencial`
 que recorta o menu. Ver `docs/app-mobile-pwa.md`.
 
+**Link público do orçamento**: `/o/[token]` com token assinado (HMAC, 7 dias),
+aprovação/recusa sem login, `AuditLog` da decisão e botão de envio por WhatsApp
+no app. Rotas em `app/api/public/**` e `POST /api/quotations/[id]/public-link`.
+
 **Qualidade**: `typecheck` e `next build` verdes; **RLS validada** no Neon;
 testes Vitest (`rls`, `flows`, `auth`).
 
@@ -115,22 +119,20 @@ Obs.: `turbo.json` declara as envs em `globalEnv` (o `envMode: strict` do Turbo
 remove do build qualquer variável não declarada).
 
 ## Backlog / próximos passos
-1. **Link público do orçamento** (`/o/[token]`) com aprovar/recusar, enviado por
-   WhatsApp — fecha o ciclo de valor na primeira sessão.
-2. **Offline do PWA** (fila local de mutações) e, só depois de validado, o app
+1. **Offline do PWA** (fila local de mutações) e, só depois de validado, o app
    **Expo + PowerSync** (offline real + inspeção com câmera).
-3. **Catálogo de modelos de veículo** exposto na API: o cadastro rápido do app
+2. **Catálogo de modelos de veículo** exposto na API: o cadastro rápido do app
    grava placa e ano, mas ainda não grava marca/modelo.
-4. **Serviço de PDF headless** (Playwright) consumindo `GET /api/invoices/:id/document`.
-5. **Anexos/notas** e **campos customizados** (schema existe, faltam API + UI).
-6. **Refino de UI** por tela (resumo de faturas, abas de settings, "Most Spent").
-7. **SaaS**: billing/planos, onboarding self-service, limites por plano.
-8. **Notificações** (e-mail/SMS) e lembretes de manutenção (agendados).
-9. **Impressão** de laudo/anexos e etiquetas QR/barcode.
-10. **Backups offsite e rotação de segredos**: automação e runbook preparados;
-    falta configurar bucket/secrets, rodar o primeiro backup e o drill de
-    restauração (`docs/backups-e-rotacao.md`).
-11. Observabilidade/alertas e runbook de produção.
+3. **Serviço de PDF headless** (Playwright) consumindo `GET /api/invoices/:id/document`.
+4. **Anexos/notas** e **campos customizados** (schema existe, faltam API + UI).
+5. **Refino de UI** por tela (resumo de faturas, abas de settings, "Most Spent").
+6. **SaaS**: billing/planos, onboarding self-service, limites por plano.
+7. **Notificações** (e-mail/SMS) e lembretes de manutenção (agendados).
+8. **Impressão** de laudo/anexos e etiquetas QR/barcode.
+9. **Backups offsite e rotação de segredos**: automação e runbook preparados;
+   falta configurar bucket/secrets, rodar o primeiro backup e o drill de
+   restauração (`docs/backups-e-rotacao.md`).
+10. Observabilidade/alertas e runbook de produção.
 
 ## Decisões de arquitetura (fechadas)
 Stack Node/TS; **Next.js full stack** (Route Handlers) + **Vercel**; Postgres
