@@ -98,6 +98,12 @@ export default function InvoiceDetailPage(): JSX.Element {
             <Button variant="secondary" onClick={openDocument}>
               Documento
             </Button>
+            <Button
+              variant="secondary"
+              onClick={() => window.open(`/api/invoices/${id}/pdf`, '_blank')}
+            >
+              PDF
+            </Button>
             {data.status !== 'PAID' && data.status !== 'CANCELLED' ? (
               <Button
                 variant="danger"

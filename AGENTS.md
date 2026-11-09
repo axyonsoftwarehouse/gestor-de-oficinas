@@ -116,6 +116,10 @@ no app. Rotas em `app/api/public/**` e `POST /api/quotations/[id]/public-link`.
 `/api/vehicle-catalog/**`. Selects encadeados no cadastro do back-office e no
 app. `pnpm db:seed:vehicle-catalog` preenche oficinas antigas.
 
+**PDF da fatura**: `GET /api/invoices/[id]/pdf` gera o documento no servidor com
+**pdfkit** (sem navegador), com itens, totais, pagamentos e rodapé paginado.
+Ver `docs/pdf-faturas.md`.
+
 **Qualidade**: `typecheck` e `next build` verdes; **RLS validada** no Neon;
 testes Vitest (`rls`, `flows`, `auth`).
 
@@ -128,31 +132,31 @@ remove do build qualquer variável não declarada).
 ## Backlog / próximos passos
 1. **Offline do PWA** (fila local de mutações) e, só depois de validado, o app
    **Expo + PowerSync** (offline real + inspeção com câmera).
-2. **Serviço de PDF headless** (Playwright) consumindo `GET /api/invoices/:id/document`.
-3. **Anexos/notas** e **campos customizados** (schema existe, faltam API + UI).
-4. **Refino de UI** por tela (resumo de faturas, abas de settings, "Most Spent").
-5. **SaaS**: billing/planos, onboarding self-service, limites por plano.
-6. **Notificações** (e-mail/SMS) e lembretes de manutenção (agendados).
-7. **Impressão** de laudo/anexos e etiquetas QR/barcode.
-8. **Placa como serviço**: preencher marca/modelo/ano automaticamente (hoje é
+2. **Anexos/notas** e **campos customizados** (schema existe, faltam API + UI).
+3. **Refino de UI** por tela (resumo de faturas, abas de settings, "Most Spent").
+4. **SaaS**: billing/planos, onboarding self-service, limites por plano.
+5. **Notificações** (e-mail/SMS) e lembretes de manutenção (agendados).
+6. **Impressão** de laudo/anexos e etiquetas QR/barcode.
+7. **Placa como serviço**: preencher marca/modelo/ano automaticamente (hoje é
    seleção manual no catálogo).
-9. **Backups offsite e rotação de segredos**: automação e runbook preparados;
+8. **Backups offsite e rotação de segredos**: automação e runbook preparados;
    falta configurar bucket/secrets, rodar o primeiro backup e o drill de
    restauração (`docs/backups-e-rotacao.md`).
-10. Observabilidade/alertas e runbook de produção.
+9. Observabilidade/alertas e runbook de produção.
 
 ## Decisões de arquitetura (fechadas)
 Stack Node/TS; **Next.js full stack** (Route Handlers) + **Vercel**; Postgres
 (Neon) + Prisma; multi-tenant schema único + `tenant_id` + **RLS**; **Better Auth**;
 **PowerSync** para offline; **OS unificada**; inspeção **versionada** com gate de
 fatura por aprovação; impostos relacionais por linha; **estoque por ledger**; RBAC
-normalizado; PDF via serviço headless; monorepo pnpm+Turborepo; **PWA mobile
-primeiro** (`/m`) e Expo/PowerSync depois de validado; **plano `essencial`**
-recorta o menu (não as permissões).
+normalizado; **PDF no servidor com pdfkit** (sem navegador); monorepo
+pnpm+Turborepo; **PWA mobile primeiro** (`/m`) e Expo/PowerSync depois de
+validado; **plano `essencial`** recorta o menu (não as permissões).
 
 ## Documentos de referência
 - `docs/escopo-projeto-e-roadmap.md` — escopo (negócio + técnico) e roadmap.
 - `docs/app-mobile-pwa.md` — app da oficina (PWA), modo Essencial e próximos passos.
+- `docs/pdf-faturas.md` — PDF da fatura (pdfkit), rotas e limitações.
 - `docs/plano-migracao-neon-vercel.md` — execução da migração.
 - `docs/deploy-vercel.md` — runbook de deploy.
 - `docs/backups-e-rotacao.md` — backup offsite, restauração e rotação de segredos.

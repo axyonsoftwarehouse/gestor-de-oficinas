@@ -147,6 +147,15 @@ export default function ReceberPage(): JSX.Element {
           </button>
         </>
       )}
+
+      <a
+        href={`/api/invoices/${id}/pdf`}
+        target="_blank"
+        rel="noreferrer"
+        className="block rounded-xl border border-surface-line bg-surface py-3 text-center text-sm font-medium text-brand"
+      >
+        Abrir fatura em PDF
+      </a>
     </div>
   );
 }
