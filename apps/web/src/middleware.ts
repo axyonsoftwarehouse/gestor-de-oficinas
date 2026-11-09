@@ -1,11 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSessionCookie } from 'better-auth/cookies';
 
-const PUBLIC_PATHS = ['/login', '/o'];
+const PUBLIC_PATHS = ['/login', '/o', '/offline'];
 /** Somente estas telas mandam o usuário logado para o painel. */
 const AUTH_PATHS = ['/login'];
 /** Assets que precisam responder sem sessão (o navegador busca antes do login). */
-const PUBLIC_ASSETS = ['/manifest.webmanifest', '/icon.svg', '/favicon.ico'];
+const PUBLIC_ASSETS = ['/manifest.webmanifest', '/icon.svg', '/favicon.ico', '/sw.js'];
 const MOBILE_UA = /android|iphone|ipad|ipod|iemobile|opera mini|mobile/i;
 /** Cookie que mantém o usuário no site completo mesmo acessando pelo celular. */
 const VIEW_COOKIE = 'gestor_view';

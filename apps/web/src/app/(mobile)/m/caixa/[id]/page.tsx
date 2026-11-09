@@ -52,7 +52,7 @@ export default function ReceberPage(): JSX.Element {
   });
 
   if (invoiceQuery.isLoading) return <Spinner />;
-  if (invoiceQuery.isError || !invoiceQuery.data) {
+  if (!invoiceQuery.data) {
     return (
       <QueryError
         error={invoiceQuery.error}

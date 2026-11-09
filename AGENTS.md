@@ -120,6 +120,10 @@ app. `pnpm db:seed:vehicle-catalog` preenche oficinas antigas.
 **pdfkit** (sem navegador), com itens, totais, pagamentos e rodapé paginado.
 Ver `docs/pdf-faturas.md`.
 
+**PWA offline**: service worker (`public/sw.js`) para assets e navegação,
+cache de queries em `localStorage` (24h) via `PersistQueryClientProvider`,
+sessão em cache e faixa de estado de rede. Ver `docs/pwa-offline.md`.
+
 **Qualidade**: `typecheck` e `next build` verdes; **RLS validada** no Neon;
 testes Vitest (`rls`, `flows`, `auth`).
 
@@ -130,8 +134,8 @@ Obs.: `turbo.json` declara as envs em `globalEnv` (o `envMode: strict` do Turbo
 remove do build qualquer variável não declarada).
 
 ## Backlog / próximos passos
-1. **Offline do PWA** (fila local de mutações) e, só depois de validado, o app
-   **Expo + PowerSync** (offline real + inspeção com câmera).
+1. **App Expo + PowerSync**: offline real com fila persistente e inspeção com
+   câmera (o PWA cobre o caso "sem sinal por alguns minutos").
 2. **Anexos/notas** e **campos customizados** (schema existe, faltam API + UI).
 3. **Refino de UI** por tela (resumo de faturas, abas de settings, "Most Spent").
 4. **SaaS**: billing/planos, onboarding self-service, limites por plano.
@@ -157,6 +161,7 @@ validado; **plano `essencial`** recorta o menu (não as permissões).
 - `docs/escopo-projeto-e-roadmap.md` — escopo (negócio + técnico) e roadmap.
 - `docs/app-mobile-pwa.md` — app da oficina (PWA), modo Essencial e próximos passos.
 - `docs/pdf-faturas.md` — PDF da fatura (pdfkit), rotas e limitações.
+- `docs/pwa-offline.md` — o que funciona offline, estratégias e limitações.
 - `docs/plano-migracao-neon-vercel.md` — execução da migração.
 - `docs/deploy-vercel.md` — runbook de deploy.
 - `docs/backups-e-rotacao.md` — backup offsite, restauração e rotação de segredos.

@@ -46,7 +46,7 @@ export default function OsPage(): JSX.Element {
   const qc = useQueryClient();
   const [publicLink, setPublicLink] = useState<string | null>(null);
 
-  const { data: job, isLoading, isError, error, refetch } = useQuery({
+  const { data: job, isLoading, error, refetch } = useQuery({
     queryKey: ['m', 'job', id],
     queryFn: () => apiFetch<JobCard>(`/job-cards/${id}`),
     enabled: Boolean(id),
@@ -129,7 +129,7 @@ export default function OsPage(): JSX.Element {
   }
 
   if (isLoading) return <Spinner />;
-  if (isError || !job) return <QueryError error={error} onRetry={() => void refetch()} />;
+  if (!job) return <QueryError error={error} onRetry={() => void refetch()} />;
 
   const existingInvoice = job.invoices?.[0];
   const actions = ACTIONS[job.status] ?? [];

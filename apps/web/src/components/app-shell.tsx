@@ -38,6 +38,7 @@ import { toast } from 'sonner';
 import { apiFetch } from '@/lib/api';
 import { canUseFeature, hasPermission } from '@/lib/permissions';
 import { useAuth } from './auth-provider';
+import { OfflineIndicator } from './offline/offline-indicator';
 import { ThemeToggle } from './theme-toggle';
 import { cn } from './ui';
 
@@ -306,6 +307,7 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
           </div>
         </header>
 
+        <OfflineIndicator />
         <main className="mx-auto w-full max-w-[1400px] flex-1 p-4 sm:p-6">{children}</main>
       </div>
     </div>

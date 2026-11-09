@@ -46,7 +46,9 @@ export default function CaixaPage(): JSX.Element {
       ) : null}
 
       {isLoading ? <Spinner /> : null}
-      {isError ? <QueryError error={error} onRetry={() => void refetch()} /> : null}
+      {isError && !data ? (
+        <QueryError error={error} onRetry={() => void refetch()} />
+      ) : null}
 
       {!isLoading && !isError && open.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-surface-line bg-surface p-8 text-center">
