@@ -1,14 +1,15 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, CircleDollarSign, Phone } from 'lucide-react';
+import { ArrowRight, CircleDollarSign, Copy, MessageCircle, Phone } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { apiFetch } from '@/lib/api';
 import { formatMoney } from '@/lib/format';
 import { JOB_STATUS, LINE_TYPE, enumLabel, enumTone } from '@/lib/labels';
-import type { JobCard, JobStatus } from '@/lib/types';
+import type { JobCard, JobStatus, Paginated, Quotation } from '@/lib/types';
 import { Badge, QueryError, Spinner } from '@/components/ui';
 
 interface Action {
@@ -43,6 +44,7 @@ export default function OsPage(): JSX.Element {
   const id = params.id;
   const router = useRouter();
   const qc = useQueryClient();
+  const [publicLink, setPublicLink] = useState<string | null>(null);
 
   const { data: job, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['m', 'job', id],
@@ -74,6 +76,57 @@ export default function OsPage(): JSX.Element {
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : 'Não foi possível faturar'),
   });
+
+  const sendQuotationLink = useMutation({
+    mutationFn: async () => {
+      const page = await apiFetch<Paginated<Quotation>>(
+        `/quotations?jobCardId=${id}&pageSize=10`,
+      );
+      const existing = page.items.find((item) => ['DRAFT', 'SENT'].includes(item.status));
+      let quotationId = existing?.id;
+
+      if (!quotationId) {
+        if (!job?.branch?.id || !job?.customerId) {
+          throw new Error('A OS precisa de filial e cliente para gerar o orçamento.');
+        }
+        const created = await apiFetch<Quotation>('/quotations', {
+          method: 'POST',
+          body: JSON.stringify({
+            branchId: job.branch.id,
+            customerId: job.customerId,
+            jobCardId: id,
+            copyFromJobCard: true,
+          }),
+        });
+        quotationId = created.id;
+      }
+
+      return apiFetch<{ publicUrl: string; expiresAt: string }>(
+        `/quotations/${quotationId}/public-link`,
+        { method: 'POST' },
+      );
+    },
+    onSuccess: (link) => {
+      setPublicLink(link.publicUrl);
+      const digits = job?.customer?.phone?.replace(/\D/g, '') ?? '';
+      const greeting = job?.customer?.name ? `Olá, ${job.customer.name}!` : 'Olá!';
+      const plate = job?.vehicle?.plate ? ` (${job.vehicle.plate})` : '';
+      const text = `${greeting} Segue o orçamento da OS ${job?.number}${plate}: ${link.publicUrl}`;
+      window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, '_blank');
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Não foi possível gerar o link'),
+  });
+
+  async function copyLink(): Promise<void> {
+    if (!publicLink) return;
+    try {
+      await navigator.clipboard.writeText(publicLink);
+      toast.success('Link copiado');
+    } catch {
+      toast.error('Não foi possível copiar o link');
+    }
+  }
 
   if (isLoading) return <Spinner />;
   if (isError || !job) return <QueryError error={error} onRetry={() => void refetch()} />;
@@ -182,6 +235,35 @@ export default function OsPage(): JSX.Element {
           </span>
         </div>
       </div>
+
+      {(job.lines?.length ?? 0) > 0 && job.status !== 'CANCELLED' ? (
+        <div className="space-y-2">
+          <button
+            type="button"
+            disabled={sendQuotationLink.isPending}
+            onClick={() => sendQuotationLink.mutate()}
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-brand bg-brand-soft text-base font-semibold text-brand-dark transition active:scale-[0.99] disabled:opacity-50"
+          >
+            <MessageCircle size={18} />
+            {sendQuotationLink.isPending ? 'Gerando link…' : 'Enviar orçamento no WhatsApp'}
+          </button>
+          {publicLink ? (
+            <div className="rounded-xl border border-surface-line bg-surface p-3">
+              <div className="text-xs text-ink-soft">
+                Link do orçamento · válido por 7 dias
+              </div>
+              <div className="mt-1 truncate font-mono text-xs text-brand">{publicLink}</div>
+              <button
+                type="button"
+                onClick={() => void copyLink()}
+                className="mt-2 flex items-center gap-1.5 text-xs font-medium text-ink-muted hover:text-ink"
+              >
+                <Copy size={14} /> Copiar link
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {existingInvoice ? (
         <Link

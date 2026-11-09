@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getSessionCookie } from 'better-auth/cookies';
 
 const PUBLIC_PATHS = ['/login', '/o'];
+/** Somente estas telas mandam o usuário logado para o painel. */
+const AUTH_PATHS = ['/login'];
 /** Assets que precisam responder sem sessão (o navegador busca antes do login). */
 const PUBLIC_ASSETS = ['/manifest.webmanifest', '/icon.svg', '/favicon.ico'];
 const MOBILE_UA = /android|iphone|ipad|ipod|iemobile|opera mini|mobile/i;
@@ -10,6 +12,12 @@ const VIEW_COOKIE = 'gestor_view';
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
+}
+
+function isAuthPath(pathname: string): boolean {
+  return AUTH_PATHS.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
 }
@@ -56,7 +64,7 @@ export function middleware(request: NextRequest): NextResponse {
       url.search = '';
       return NextResponse.redirect(url);
     }
-    if (sessionCookie && isPublic) {
+    if (sessionCookie && isAuthPath(pathname)) {
       const url = request.nextUrl.clone();
       url.pathname = isMobile ? '/m/hoje' : '/dashboard';
       url.search = '';

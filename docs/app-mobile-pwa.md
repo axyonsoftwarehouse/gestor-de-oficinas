@@ -79,15 +79,55 @@ do app nativo.
 Dinheiro, Pix, Cartão etc.). O pagamento usa `POST /api/invoices/:id/payments`
 com `amount` e `methodId`.
 
+## Link público do orçamento
+
+O cliente aprova ou recusa sem criar conta e sem instalar nada.
+
+**Como funciona**
+
+1. No app (`/m/os/[id]`), o botão **Enviar orçamento no WhatsApp** procura um
+   orçamento aberto da OS; se não existir, cria com `copyFromJobCard` e chama
+   `POST /api/quotations/:id/public-link`.
+2. A rota devolve `{ publicUrl, expiresAt }` e abre o `wa.me` com a mensagem
+   pronta (inclui telefone do cliente quando cadastrado).
+3. O cliente abre `/o/<token>`, vê itens, total e validade, e escolhe
+   **Aprovar** ou **Recusar**.
+4. A decisão vai para `POST /api/public/quotations/<token>/decision`, muda o
+   status do orçamento e grava um `AuditLog` (`quotation.approved_public` ou
+   `quotation.rejected_public`, com `channel: public_link`).
+
+**Token**
+
+- Assinado com HMAC-SHA256 (`PUBLIC_LINK_SECRET` ou `BETTER_AUTH_SECRET`).
+- Carrega `quotationId`, `tenantId` e expiração (7 dias). Sem coluna nova no
+  banco.
+- A rota pública abre uma transação com `app.current_tenant` e deixa a RLS
+  filtrar: o token não dá acesso a nada além daquele orçamento.
+- Idempotente: repetir a mesma decisão devolve o estado atual. Decisão contrária
+  a orçamento já fechado (aprovado, recusado ou faturado) retorna 400.
+- Trocar o segredo invalida todos os links já enviados.
+
+**Rotas**
+
+| Rota | Autenticação | O que faz |
+| --- | --- | --- |
+| `GET /api/public/quotations/[token]` | nenhuma | dados públicos do orçamento |
+| `POST /api/public/quotations/[token]/decision` | nenhuma | aprova/recusa |
+| `POST /api/quotations/[id]/public-link` | `quotation.edit` | gera/renova o link |
+| `/o/[token]` | nenhuma | página do cliente (mobile-first) |
+
+O middleware trata `/o/*` como público **sem** expulsar usuários logados (o dono
+pode abrir o próprio link).
+
 ## O que ainda falta (em ordem)
 
-1. **Link público do orçamento** (`/o/[token]`) com aprovar/recusar — fecha o
-   ciclo de valor já na primeira sessão.
-2. **Catálogo de modelos de veículo** exposto na API: hoje o cadastro rápido
-   grava placa e ano, sem marca/modelo.
-3. **Offline de verdade**: fila local de mutações no PWA; depois PowerSync + Expo.
-4. **Onboarding de primeira OS**: importar contatos do WhatsApp/caderno.
-5. **Impressão/etiqueta** e **lembrete de revisão** por WhatsApp.
+1. **Offline de verdade**: fila local de mutações no PWA; depois PowerSync + Expo.
+2. **Catálogo de modelos de veículo** exposto na API: o cadastro rápido grava
+   placa e ano, sem marca/modelo.
+3. **Onboarding de primeira OS**: importar contatos do WhatsApp/caderno.
+4. **Impressão/etiqueta** e **lembrete de revisão** por WhatsApp.
+5. **Aprovação refletida na OS**: hoje o link aprova o orçamento; a OS continua
+   o fluxo normal no app.
 
 ## Como testar
 
