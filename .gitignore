@@ -47,5 +47,8 @@ packages/database/prisma/migrations/dev.db*
 .vscode/*
 !.vscode/extensions.json
 
+# Configuracao local de agentes (pode conter segredos)
+.claude/
+
 .vercel
 .env*
