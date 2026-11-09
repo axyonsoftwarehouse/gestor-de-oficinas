@@ -12,6 +12,7 @@ import { useDebounced } from '@/lib/use-debounced';
 import { useFormErrors } from '@/lib/use-form-errors';
 import { useAuth } from '@/components/auth-provider';
 import { useConfirm } from '@/components/confirm';
+import { VehicleCatalogFields } from '@/components/vehicle-catalog-fields';
 import { DataTable, usePagedQuery, type Column } from '@/components/data-table';
 import {
   Button,
@@ -27,6 +28,8 @@ import {
 
 interface VehicleForm {
   customerId: string;
+  brandId: string;
+  modelId: string;
   plate: string;
   vin: string;
   year: string;
@@ -35,6 +38,8 @@ interface VehicleForm {
 
 const EMPTY: VehicleForm = {
   customerId: '',
+  brandId: '',
+  modelId: '',
   plate: '',
   vin: '',
   year: '',
@@ -88,6 +93,8 @@ export default function VehiclesPage(): JSX.Element {
     mutationFn: async () => {
       const body = JSON.stringify({
         customerId: form.customerId,
+        brandId: form.brandId || undefined,
+        modelId: form.modelId || undefined,
         plate: form.plate || undefined,
         vin: form.vin || undefined,
         year: form.year ? Number(form.year) : undefined,
@@ -129,6 +136,8 @@ export default function VehiclesPage(): JSX.Element {
     setEditing(vehicle);
     const values: VehicleForm = {
       customerId: vehicle.customerId,
+      brandId: vehicle.brand?.id ?? '',
+      modelId: vehicle.model?.id ?? '',
       plate: vehicle.plate ?? '',
       vin: vehicle.vin ?? '',
       year: vehicle.year ? String(vehicle.year) : '',
@@ -278,6 +287,14 @@ export default function VehiclesPage(): JSX.Element {
               />
             </Field>
           </div>
+
+          <VehicleCatalogFields
+            brandId={form.brandId}
+            modelId={form.modelId}
+            onChange={({ brandId, modelId }) =>
+              setForm((previous) => ({ ...previous, brandId, modelId }))
+            }
+          />
         </form>
       </Modal>
     </div>

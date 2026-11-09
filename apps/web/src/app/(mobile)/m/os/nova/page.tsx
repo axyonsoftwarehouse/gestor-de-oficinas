@@ -10,6 +10,7 @@ import { formatMoney } from '@/lib/format';
 import { useBranches, useServices } from '@/lib/queries';
 import { useDebounced } from '@/lib/use-debounced';
 import type { Customer, JobCard, Paginated, ServiceItem, Vehicle } from '@/lib/types';
+import { VehicleCatalogFields } from '@/components/vehicle-catalog-fields';
 import { Button, Field, Input, Spinner } from '@/components/ui';
 
 export default function NovaOsPage(): JSX.Element {
@@ -23,6 +24,8 @@ export default function NovaOsPage(): JSX.Element {
   const [customerForm, setCustomerForm] = useState({ name: '', phone: '' });
   const [newPlate, setNewPlate] = useState('');
   const [year, setYear] = useState('');
+  const [brandId, setBrandId] = useState('');
+  const [modelId, setModelId] = useState('');
   const [complaint, setComplaint] = useState('');
 
   const [serviceSearch, setServiceSearch] = useState('');
@@ -93,6 +96,8 @@ export default function NovaOsPage(): JSX.Element {
             customerId: createdCustomer.id,
             plate: plateValue,
             year: year ? Number(year) : undefined,
+            brandId: brandId || undefined,
+            modelId: modelId || undefined,
           }),
         });
         customerId = createdCustomer.id;
@@ -268,6 +273,16 @@ export default function NovaOsPage(): JSX.Element {
                     />
                   </Field>
                 </div>
+
+                <VehicleCatalogFields
+                  brandId={brandId}
+                  modelId={modelId}
+                  onChange={({ brandId: nextBrand, modelId: nextModel }) => {
+                    setBrandId(nextBrand);
+                    setModelId(nextModel);
+                  }}
+                />
+
                 <button
                   type="button"
                   onClick={() => setCreatingVehicle(false)}
