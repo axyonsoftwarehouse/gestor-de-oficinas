@@ -38,6 +38,7 @@ Em 09/10/2026, painel web e API estão publicados na Vercel com banco Neon. O n�
 | 03/10/2026 | Serviço headless HTML→PDF | Suportar A4, recibo e etiquetas fora do limite do app principal | Gerar PDF complexo dentro das rotas comuns |
 | 03/10/2026 | Portal do cliente por token expirável | Aprovação, acompanhamento e assinatura sem criar conta obrigatória | Exigir usuário permanente para cada cliente |
 | 03/10/2026 | Visual inspirado no FinTrust, sem cópia literal | Obter consistência visual adaptada ao domínio | Replicar o kit sem adaptação |
+| 17/10/2026 | Retenção padrão de backup: 3 diários + 1 mensal | Cabe no free tier de 10 GB compartilhado entre os 7 projetos; ajustável por repositório | 30 diários + 12 mensais como padrão |
 
 ## 4. Regras de desenvolvimento
 
@@ -151,3 +152,4 @@ Em 09/10/2026, painel web e API estão publicados na Vercel com banco Neon. O n�
 | 09/10/2026 | Criação inicial a partir do histórico Git, documentação existente e estado do projeto no commit `83ac90f`. |
 | 17/10/2026 | Revisão de links, citações por seção e contagens do mapa antes do commit; sem alteração de código. |
 | 17/10/2026 | Automação de backup cifrado (workflow diário, scripts de dump/restauração) e procedimento de rotação de segredos; risco segue aberto até configurar bucket/secrets e concluir o drill. |
+| 17/10/2026 | Retenção padrão de backup ajustada para 3 diários + 1 mensal e orçamento do free tier (7 projetos) documentado no runbook. |

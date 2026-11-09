@@ -18,8 +18,8 @@ Actions e não depende da Vercel:
    e fingerprint da chave (nunca a chave).
 7. Envia dump, checksum e manifesto para um **bucket S3-compatível** privado
    (Cloudflare R2, Backblaze B2, AWS S3, MinIO etc.).
-8. Aplica retenção: **30 dias** para backups diários e **365 dias** para o backup
-   do dia 1 de cada mês.
+8. Aplica retenção padrão de **3 dias** para backups diários e **30 dias** para o
+   backup do dia 1 de cada mês, configurável por repositório.
 9. Guarda uma cópia cifrada por **7 dias** como artefato do GitHub, como rede de
    segurança se o upload falhar.
 
@@ -36,7 +36,7 @@ Arquivos:
 | Item            | Padrão preparado              | Observação                                                      |
 | --------------- | ----------------------------- | --------------------------------------------------------------- |
 | Frequência      | 1x/dia, 03:00 UTC             | RPO de até 24 h; rode manualmente antes de migrações de risco   |
-| Retenção        | 30 diários + 365 mensais      | Configurável por variáveis do repositório                       |
+| Retenção        | 3 diários + 1 mensal          | Padrão free tier; configurável por repositório; ver §2.1        |
 | Storage         | Qualquer S3-compatível        | R2 é a opção de menor custo sugerida; o bucket deve ser privado |
 | Cifra           | AES-256-GCM, chave via scrypt | Sem a chave, o backup é irrecuperável                           |
 | Cópia no GitHub | Artefato cifrado, 7 dias      | Não substitui o bucket; é fallback                              |
@@ -45,6 +45,66 @@ Arquivos:
 
 O backup contém dados pessoais e financeiros. Mantenha o bucket privado,
 credenciais com o menor privilégio possível e a chave de cifra fora do GitHub.
+
+### 2.1 Orçamento do free tier (7 projetos)
+
+O R2 gratuito é por conta: 10 GB-mês de storage, 1 milhão de operações Class A,
+10 milhões de Class B e egress grátis. Buckets adicionais não multiplicam a cota.
+O R2 pode pedir cartão no checkout; dentro do free tier o custo é zero.
+
+Com `P` projetos, dump cifrado de `D` MB e `N` cópias por projeto:
+
+```text
+total = P × D × N
+```
+
+Para 7 projetos caberem em 10 GB (10.000 MB), o máximo é
+`N = 10.000 / (7 × D)`.
+
+| Dump cifrado por projeto | Cópias que cabem nos 7 projetos |
+| -----------------------: | ------------------------------: |
+|                    50 MB |                             ~28 |
+|                   100 MB |                             ~14 |
+|                   200 MB |                              ~7 |
+|                   300 MB |                              ~4 |
+|                   500 MB |                              ~2 |
+|                     1 GB |                              ~1 |
+
+Use uma cópia a menos como margem. Políticas sugeridas:
+
+| Dump por projeto | Política              | Cópias aprox. | Total nos 7 projetos |
+| ---------------: | --------------------- | ------------: | -------------------: |
+|       até 100 MB | 7 diários + 3 mensais |           ~10 |                ~7 GB |
+|       até 200 MB | 5 diários + 1 mensal  |            ~6 |              ~8,4 GB |
+|       até 300 MB | 3 diários + 1 mensal  |            ~4 |              ~8,4 GB |
+|       até 700 MB | 1 diário + 1 mensal   |            ~2 |              ~9,8 GB |
+|  acima de 700 MB | 1 diário, sem mensal  |             1 | até ~1,4 GB por dump |
+
+O padrão do workflow é **3 diários + 1 mensal** (`BACKUP_RETENTION_DAYS=3`,
+`BACKUP_MONTHLY_RETENTION_DAYS=30`), que cabe em 10 GB se cada dump tiver até
+aproximadamente 350 MB. Ajuste por repositório depois de medir cada projeto.
+
+### 2.2 Como medir o dump
+
+Rode um backup manual por projeto e leia a linha `Tamanho:` no log, ou o campo
+`file.sizeBytes` do manifesto (em bytes). Exemplo local:
+
+```powershell
+pnpm db:backup
+# Tamanho: 123.45 MB
+```
+
+Sem `--upload`, o arquivo fica apenas em `.backups/`. Anote o tamanho e apague o
+diretório depois (ele é gitignored). O mesmo tamanho aparece no log da execução
+manual do workflow.
+
+Se a soma dos 7 projetos passar de 10 GB, reduza a retenção nos repositórios
+maiores. O free tier não é um teto rígido: a Cloudflare cobra o excedente.
+Acompanhe o uso e configure alertas de billing.
+
+O backup contém apenas o banco. Imagens e anexos fora do banco não entram nesse
+cálculo; eles precisam de um bucket próprio e de uma política de retenção
+separada.
 
 ## 3. Configuração inicial (uma vez)
 
@@ -99,8 +159,8 @@ Em **Settings → Secrets and variables → Actions**:
 | `BACKUP_S3_ACCESS_KEY_ID`       | secret              | credencial de escrita do bucket                           |
 | `BACKUP_S3_SECRET_ACCESS_KEY`   | secret              | segredo da credencial                                     |
 | `BACKUP_S3_PREFIX`              | variable (opcional) | prefixo das chaves; padrão `gestor-oficinas`              |
-| `BACKUP_RETENTION_DAYS`         | variable (opcional) | retenção diária; padrão `30`                              |
-| `BACKUP_MONTHLY_RETENTION_DAYS` | variable (opcional) | retenção mensal; padrão `365`                             |
+| `BACKUP_RETENTION_DAYS`         | variable (opcional) | retenção diária; padrão `3`                               |
+| `BACKUP_MONTHLY_RETENTION_DAYS` | variable (opcional) | retenção mensal; padrão `30`                              |
 
 O workflow usa `PROD_DIRECT_URL` como `BACKUP_DATABASE_URL`. Nenhuma credencial
 de produção fica no código ou no `.env` do repositório. As variáveis `S3_*` do
@@ -291,7 +351,8 @@ operacionais, mas deve entrar no calendário anual.
 2. Atualize o secret `BACKUP_ENCRYPTION_KEY` no GitHub.
 3. Rode um backup manual e confirme o novo `keyId` no manifesto.
 4. Mantenha a chave antiga disponível até o último backup cifrado com ela sair da
-   retenção (até 365 dias), senão backups antigos ficam irrecuperáveis.
+   retenção configurada (padrão 30 dias; aumente se usar retenção maior), senão
+   backups antigos ficam irrecuperáveis.
 
 ### 7.5 Credenciais do bucket
 
