@@ -8,8 +8,20 @@ import type { UpdateInvoiceDto } from '../dtos/update-invoice.dto';
 import { nextNumber } from './number-sequence.service';
 
 const detailInclude = {
-  customer: { select: { id: true, name: true } },
-  jobCard: { select: { id: true, number: true } },
+  customer: { select: { id: true, name: true, document: true } },
+  jobCard: {
+    select: {
+      id: true,
+      number: true,
+      vehicle: {
+        select: {
+          plate: true,
+          brand: { select: { name: true } },
+          model: { select: { name: true } },
+        },
+      },
+    },
+  },
   quotation: { select: { id: true, number: true } },
   lines: {
     orderBy: { sequence: 'asc' as const },
