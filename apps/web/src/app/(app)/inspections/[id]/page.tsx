@@ -21,10 +21,10 @@ import {
 import { INSPECTION_STATUS } from '@/lib/labels';
 
 const RESULTS: { value: InspectionResult; label: string; active: string }[] = [
-  { value: 'OK', label: 'OK', active: 'bg-emerald-600 text-white' },
-  { value: 'ATTENTION', label: 'Atenção', active: 'bg-amber-500 text-white' },
-  { value: 'REPAIR', label: 'Reparar', active: 'bg-red-600 text-white' },
-  { value: 'NOT_APPLICABLE', label: 'N/A', active: 'bg-slate-500 text-white' },
+  { value: 'OK', label: 'OK', active: 'bg-state-success text-white' },
+  { value: 'ATTENTION', label: 'Atenção', active: 'bg-state-warning text-ink-strong' },
+  { value: 'REPAIR', label: 'Reparar', active: 'bg-state-danger text-white' },
+  { value: 'NOT_APPLICABLE', label: 'N/A', active: 'bg-ink-muted text-white' },
 ];
 
 function AnswerRow({
@@ -50,11 +50,11 @@ function AnswerRow({
   const hasOptions = answer.question.options.length > 0;
 
   return (
-    <div className="rounded-md border border-slate-200 p-3">
+    <div className="rounded-md border border-surface-line p-3">
       <div className="flex items-start justify-between gap-3">
-        <div className="text-sm font-medium text-slate-800">
+        <div className="text-sm font-medium text-ink">
           {answer.question.label}
-          {answer.question.required ? <span className="text-red-500"> *</span> : null}
+          {answer.question.required ? <span className="text-state-danger"> *</span> : null}
         </div>
         <div className="flex flex-wrap gap-1">
           {RESULTS.map((option) => (
@@ -65,7 +65,7 @@ function AnswerRow({
                 save.mutate({ result: option.value });
               }}
               className={`rounded-full px-2 py-0.5 text-xs ${
-                result === option.value ? option.active : 'bg-slate-100 text-slate-600'
+                result === option.value ? option.active : 'bg-surface-page text-ink-muted hover:text-ink'
               }`}
             >
               {option.label}
@@ -108,7 +108,7 @@ function AnswerRow({
 
       {result === 'REPAIR' ? (
         <div className="mt-2 flex items-center gap-2 text-xs">
-          <span className="text-slate-500">Aprovação do cliente:</span>
+          <span className="text-ink-muted">Aprovação do cliente:</span>
           <Badge
             tone={
               approval === 'APPROVED'
@@ -214,7 +214,7 @@ export default function InspectionDetailPage(): JSX.Element {
       <ErrorText>{error}</ErrorText>
 
       {data.completedAt ? (
-        <p className="mb-4 text-xs text-slate-500">
+        <p className="mb-4 text-xs text-ink-muted">
           Concluída em {formatDateTime(data.completedAt)}
         </p>
       ) : null}
@@ -222,7 +222,7 @@ export default function InspectionDetailPage(): JSX.Element {
       <div className="space-y-6">
         {orderedSections.map((section) => (
           <Card key={section.title} className="p-4">
-            <h2 className="mb-3 text-sm font-semibold text-slate-800">{section.title}</h2>
+            <h2 className="mb-3 text-sm font-semibold text-ink">{section.title}</h2>
             <div className="space-y-3">
               {section.items.map((answer) => (
                 <AnswerRow key={answer.id} inspectionId={id} answer={answer} />

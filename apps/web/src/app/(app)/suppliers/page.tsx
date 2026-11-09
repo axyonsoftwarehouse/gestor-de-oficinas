@@ -4,9 +4,18 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { apiFetch } from '@/lib/api';
+import {
+  documentError,
+  emailError,
+  maskDocument,
+  maskPhone,
+  phoneError,
+  validateChanged,
+} from '@/lib/br';
 import { hasPermission } from '@/lib/permissions';
 import type { Supplier } from '@/lib/types';
 import { useDebounced } from '@/lib/use-debounced';
+import { useFormErrors } from '@/lib/use-form-errors';
 import { useAuth } from '@/components/auth-provider';
 import { useConfirm } from '@/components/confirm';
 import { DataTable, usePagedQuery, type Column } from '@/components/data-table';
@@ -67,6 +76,7 @@ export default function SuppliersPage(): JSX.Element {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [form, setForm] = useState<SupplierForm>(EMPTY);
+  const [initial, setInitial] = useState<SupplierForm>(EMPTY);
   const [error, setError] = useState('');
 
   const { query, page, setPage } = usePagedQuery<Supplier>('suppliers', '/suppliers', {
@@ -102,19 +112,24 @@ export default function SuppliersPage(): JSX.Element {
   function openCreate(): void {
     setEditing(null);
     setForm(EMPTY);
+    setInitial(EMPTY);
+    feedback.reset();
     setError('');
     setOpen(true);
   }
 
   function openEdit(supplier: Supplier): void {
     setEditing(supplier);
-    setForm({
+    const values: SupplierForm = {
       name: supplier.name,
       document: supplier.document ?? '',
       email: supplier.email ?? '',
       phone: supplier.phone ?? '',
       notes: supplier.notes ?? '',
-    });
+    };
+    setForm(values);
+    setInitial(values);
+    feedback.reset();
     setError('');
     setOpen(true);
   }
@@ -128,6 +143,14 @@ export default function SuppliersPage(): JSX.Element {
     });
     if (ok) remove.mutate(supplier.id);
   }
+
+  const { errors } = validateChanged(form, initial, {
+    document: (value) => documentError(value),
+    email: emailError,
+    phone: phoneError,
+  });
+  const feedback = useFormErrors(errors);
+  const canSave = Boolean(form.name.trim()) && !save.isPending;
 
   function set<K extends keyof SupplierForm>(key: K, value: SupplierForm[K]): void {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -192,7 +215,7 @@ export default function SuppliersPage(): JSX.Element {
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" form="supplier-form" disabled={save.isPending || !form.name}>
+            <Button type="submit" form="supplier-form" disabled={!canSave}>
               {save.isPending ? 'Salvando…' : 'Salvar'}
             </Button>
           </>
@@ -201,9 +224,10 @@ export default function SuppliersPage(): JSX.Element {
         <form
           id="supplier-form"
           className="space-y-4"
+          onBlur={feedback.onBlur}
           onSubmit={(event) => {
             event.preventDefault();
-            if (form.name && !save.isPending) save.mutate();
+            if (canSave && feedback.attempt()) save.mutate();
           }}
         >
           <ErrorText>{error}</ErrorText>
@@ -216,18 +240,31 @@ export default function SuppliersPage(): JSX.Element {
                 onChange={(e) => set('name', e.target.value)}
               />
             </Field>
-            <Field label="Documento (CNPJ/CPF)">
-              <Input value={form.document} onChange={(e) => set('document', e.target.value)} />
+            <Field label="CNPJ ou CPF" error={feedback.errorFor('document')}>
+              <Input
+                name="document"
+                inputMode="numeric"
+                placeholder="00.000.000/0000-00"
+                value={form.document}
+                onChange={(e) => set('document', maskDocument(e.target.value))}
+              />
             </Field>
-            <Field label="E-mail">
+            <Field label="E-mail" error={feedback.errorFor('email')}>
               <Input
                 type="email"
+                name="email"
                 value={form.email}
                 onChange={(e) => set('email', e.target.value)}
               />
             </Field>
-            <Field label="Telefone">
-              <Input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+            <Field label="Telefone" error={feedback.errorFor('phone')}>
+              <Input
+                type="tel"
+                name="phone"
+                placeholder="(00) 00000-0000"
+                value={form.phone}
+                onChange={(e) => set('phone', maskPhone(e.target.value))}
+              />
             </Field>
           </div>
           <Field label="Observações">

@@ -4,10 +4,22 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { apiFetch } from '@/lib/api';
+import {
+  cepError,
+  documentError,
+  emailError,
+  maskCep,
+  maskCnpj,
+  maskCpf,
+  maskPhone,
+  phoneError,
+  validateChanged,
+} from '@/lib/br';
 import { CUSTOMER_TYPE, enumLabel, enumOptions } from '@/lib/labels';
 import { hasPermission } from '@/lib/permissions';
 import type { Customer } from '@/lib/types';
 import { useDebounced } from '@/lib/use-debounced';
+import { useFormErrors } from '@/lib/use-form-errors';
 import { useAuth } from '@/components/auth-provider';
 import { useConfirm } from '@/components/confirm';
 import { DataTable, usePagedQuery, type Column } from '@/components/data-table';
@@ -85,6 +97,7 @@ export default function CustomersPage(): JSX.Element {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [form, setForm] = useState<CustomerForm>(EMPTY);
+  const [initial, setInitial] = useState<CustomerForm>(EMPTY);
   const [error, setError] = useState('');
 
   const { query, page, setPage } = usePagedQuery<Customer>('customers', '/customers', {
@@ -120,13 +133,15 @@ export default function CustomersPage(): JSX.Element {
   function openCreate(): void {
     setEditing(null);
     setForm(EMPTY);
+    setInitial(EMPTY);
+    feedback.reset();
     setError('');
     setOpen(true);
   }
 
   function openEdit(customer: Customer): void {
     setEditing(customer);
-    setForm({
+    const values: CustomerForm = {
       type: customer.type,
       name: customer.name,
       document: customer.document ?? '',
@@ -135,7 +150,10 @@ export default function CustomersPage(): JSX.Element {
       city: customer.city ?? '',
       state: customer.state ?? '',
       zip: customer.zip ?? '',
-    });
+    };
+    setForm(values);
+    setInitial(values);
+    feedback.reset();
     setError('');
     setOpen(true);
   }
@@ -153,6 +171,16 @@ export default function CustomersPage(): JSX.Element {
   function set<K extends keyof CustomerForm>(key: K, value: CustomerForm[K]): void {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
+
+  const isCompany = form.type === 'COMPANY';
+  const { errors } = validateChanged(form, initial, {
+    document: (value) => documentError(value, isCompany ? 'cnpj' : 'cpf'),
+    phone: phoneError,
+    email: emailError,
+    zip: cepError,
+  });
+  const feedback = useFormErrors(errors);
+  const canSave = Boolean(form.name.trim()) && !save.isPending;
 
   const canCreate = hasPermission(granted, 'customer.create');
   const canEdit = hasPermission(granted, 'customer.edit');
@@ -211,7 +239,7 @@ export default function CustomersPage(): JSX.Element {
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" form="customer-form" disabled={save.isPending || !form.name}>
+            <Button type="submit" form="customer-form" disabled={!canSave}>
               {save.isPending ? 'Salvando…' : 'Salvar'}
             </Button>
           </>
@@ -220,9 +248,10 @@ export default function CustomersPage(): JSX.Element {
         <form
           id="customer-form"
           className="space-y-4"
+          onBlur={feedback.onBlur}
           onSubmit={(event) => {
             event.preventDefault();
-            if (form.name && !save.isPending) save.mutate();
+            if (canSave && feedback.attempt()) save.mutate();
           }}
         >
           <ErrorText>{error}</ErrorText>
@@ -230,7 +259,14 @@ export default function CustomersPage(): JSX.Element {
             <Field label="Tipo">
               <Select
                 value={form.type}
-                onChange={(e) => set('type', e.target.value as CustomerForm['type'])}
+                onChange={(e) => {
+                  const type = e.target.value as CustomerForm['type'];
+                  setForm((prev) => ({
+                    ...prev,
+                    type,
+                    document: type === 'COMPANY' ? maskCnpj(prev.document) : maskCpf(prev.document),
+                  }));
+                }}
               >
                 {enumOptions(CUSTOMER_TYPE).map((option) => (
                   <option key={option.value} value={option.value}>
@@ -247,19 +283,30 @@ export default function CustomersPage(): JSX.Element {
                 onChange={(e) => set('name', e.target.value)}
               />
             </Field>
-            <Field label={form.type === 'COMPANY' ? 'CNPJ' : 'CPF'}>
-              <Input value={form.document} onChange={(e) => set('document', e.target.value)} />
-            </Field>
-            <Field label="Telefone">
+            <Field label={isCompany ? 'CNPJ' : 'CPF'} error={feedback.errorFor('document')}>
               <Input
-                type="tel"
-                value={form.phone}
-                onChange={(e) => set('phone', e.target.value)}
+                inputMode="numeric"
+                placeholder={isCompany ? '00.000.000/0000-00' : '000.000.000-00'}
+                name="document"
+                value={form.document}
+                onChange={(e) =>
+                  set('document', isCompany ? maskCnpj(e.target.value) : maskCpf(e.target.value))
+                }
               />
             </Field>
-            <Field label="E-mail">
+            <Field label="Telefone" error={feedback.errorFor('phone')}>
+              <Input
+                type="tel"
+                placeholder="(00) 00000-0000"
+                name="phone"
+                value={form.phone}
+                onChange={(e) => set('phone', maskPhone(e.target.value))}
+              />
+            </Field>
+            <Field label="E-mail" error={feedback.errorFor('email')}>
               <Input
                 type="email"
+                name="email"
                 value={form.email}
                 onChange={(e) => set('email', e.target.value)}
               />
@@ -274,11 +321,13 @@ export default function CustomersPage(): JSX.Element {
                 onChange={(e) => set('state', e.target.value.toUpperCase())}
               />
             </Field>
-            <Field label="CEP">
+            <Field label="CEP" error={feedback.errorFor('zip')}>
               <Input
                 inputMode="numeric"
+                placeholder="00000-000"
+                name="zip"
                 value={form.zip}
-                onChange={(e) => set('zip', e.target.value)}
+                onChange={(e) => set('zip', maskCep(e.target.value))}
               />
             </Field>
           </div>

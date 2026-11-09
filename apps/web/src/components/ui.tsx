@@ -33,7 +33,7 @@ export function Button({
     <button
       {...props}
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium outline-none transition focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-1 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-50',
         variants[variant],
         className,
       )}
@@ -97,16 +97,30 @@ export function Field({
   label,
   children,
   hint,
+  error,
 }: {
   label: string;
   children: ReactNode;
   hint?: string;
+  /** Mensagem de validação; substitui o `hint` e destaca o campo. */
+  error?: string;
 }): JSX.Element {
   return (
-    <label className="block space-y-1.5">
+    <label
+      className={cn(
+        'block space-y-1.5',
+        error && '[&_input]:border-state-danger [&_input]:focus:ring-state-danger/20',
+      )}
+    >
       <span className="text-xs font-medium text-ink-muted">{label}</span>
       {children}
-      {hint ? <span className="block text-xs text-ink-soft">{hint}</span> : null}
+      {error ? (
+        <span role="alert" className="block text-xs text-state-danger">
+          {error}
+        </span>
+      ) : hint ? (
+        <span className="block text-xs text-ink-soft">{hint}</span>
+      ) : null}
     </label>
   );
 }

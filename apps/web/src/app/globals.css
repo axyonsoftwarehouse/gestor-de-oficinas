@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -30,17 +28,6 @@
   --state-danger: 235 87 87;
   --state-info: 47 128 237;
 
-  --slate-50: 246 247 251;
-  --slate-100: 238 241 247;
-  --slate-200: 223 229 241;
-  --slate-300: 201 210 224;
-  --slate-400: 169 180 196;
-  --slate-500: 142 152 167;
-  --slate-600: 93 107 128;
-  --slate-700: 58 74 97;
-  --slate-800: 35 49 69;
-  --slate-900: 26 37 54;
-  --slate-950: 20 23 54;
 
   color-scheme: light;
 }
@@ -71,17 +58,6 @@
   --state-danger: 248 113 113;
   --state-info: 74 144 255;
 
-  --slate-50: 15 20 30;
-  --slate-100: 20 26 38;
-  --slate-200: 41 51 68;
-  --slate-300: 55 65 81;
-  --slate-400: 90 102 121;
-  --slate-500: 148 163 184;
-  --slate-600: 172 186 205;
-  --slate-700: 203 213 225;
-  --slate-800: 226 232 240;
-  --slate-900: 241 245 249;
-  --slate-950: 255 255 255;
 
   color-scheme: dark;
 }

@@ -62,24 +62,24 @@ export default function InspectionTemplateDetailPage(): JSX.Element {
         <EmptyState message="Sem versões publicadas." />
       ) : (
         <>
-          <p className="mb-4 text-xs text-slate-500">
+          <p className="mb-4 text-xs text-ink-muted">
             Publicada em {formatDate(latest.publishedAt)}
           </p>
           <div className="space-y-6">
             {latest.sections.map((section) => (
               <Card key={section.id} className="p-4">
-                <h2 className="mb-3 text-sm font-semibold text-slate-800">{section.title}</h2>
+                <h2 className="mb-3 text-sm font-semibold text-ink">{section.title}</h2>
                 <ul className="space-y-2">
                   {section.questions.map((question) => (
                     <li
                       key={question.id}
-                      className="flex items-center justify-between border-b border-slate-100 pb-2 text-sm"
+                      className="flex items-center justify-between border-b border-surface-line/70 pb-2 text-sm"
                     >
-                      <span className="text-slate-700">
+                      <span className="text-ink">
                         {question.label}
-                        {question.required ? <span className="text-red-500"> *</span> : null}
+                        {question.required ? <span className="text-state-danger"> *</span> : null}
                       </span>
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-ink-soft">
                         {enumLabel(QUESTION_TYPE, question.type)}
                         {question.options.length > 0
                           ? ` · ${question.options.map((option) => option.label).join(' / ')}`
