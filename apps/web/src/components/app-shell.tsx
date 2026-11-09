@@ -2,6 +2,8 @@
 
 import * as Dialog from '@radix-ui/react-dialog';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { useMutation } from '@tanstack/react-query';
+import { normalizePlan, type PlanId } from '@gestor/shared';
 import {
   Boxes,
   Building2,
@@ -19,6 +21,8 @@ import {
   Receipt,
   Shield,
   ShoppingCart,
+  Smartphone,
+  Sparkles,
   Truck,
   UserCog,
   Users,
@@ -30,7 +34,9 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import { canView } from '@/lib/permissions';
+import { toast } from 'sonner';
+import { apiFetch } from '@/lib/api';
+import { canUseFeature, hasPermission } from '@/lib/permissions';
 import { useAuth } from './auth-provider';
 import { ThemeToggle } from './theme-toggle';
 import { cn } from './ui';
@@ -164,16 +170,35 @@ function NavList({
 
 export function AppShell({ children }: { children: ReactNode }): JSX.Element {
   const pathname = usePathname();
-  const { session, logout } = useAuth();
+  const { session, logout, refresh } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Fecha o menu móvel ao navegar.
   useEffect(() => setMobileOpen(false), [pathname]);
 
   const granted = session?.permissions ?? [];
+  const plan = normalizePlan(session?.tenant.plan);
+  const isOwner = hasPermission(granted, 'setting.edit');
+
+  const togglePlan = useMutation({
+    mutationFn: (next: PlanId) =>
+      apiFetch('/tenant/plan', {
+        method: 'PATCH',
+        body: JSON.stringify({ plan: next }),
+      }),
+    onSuccess: async () => {
+      await refresh();
+      toast.success(
+        plan === 'essencial' ? 'Modo completo ativado' : 'Modo essencial ativado',
+      );
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Não foi possível trocar o modo'),
+  });
+
   const groups = NAV.map((group) => ({
     ...group,
-    items: group.items.filter((item) => canView(granted, item.feature)),
+    items: group.items.filter((item) => canUseFeature(granted, item.feature, plan)),
   })).filter((group) => group.items.length > 0);
 
   const current = groups.flatMap((group) => group.items).find((item) => isActive(pathname, item.href));
@@ -183,6 +208,18 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-surface-line bg-surface lg:flex">
         <Brand tenant={session?.tenant.name} />
         <NavList groups={groups} pathname={pathname} />
+        <div className="border-t border-surface-line p-3">
+          <Link
+            href="/m/hoje?desktop=0"
+            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-muted transition hover:bg-surface-page hover:text-ink"
+          >
+            <Smartphone size={16} />
+            Abrir no celular
+          </Link>
+          <div className="px-3 pt-1.5 text-[11px] uppercase tracking-wider text-ink-soft">
+            Modo {plan}
+          </div>
+        </div>
       </aside>
 
       <Dialog.Root open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -245,6 +282,17 @@ export function AppShell({ children }: { children: ReactNode }): JSX.Element {
                     <div className="truncate text-xs text-ink-muted">{session?.user.email}</div>
                   </div>
                   <DropdownMenu.Separator className="my-1 h-px bg-surface-line" />
+                  {isOwner ? (
+                    <DropdownMenu.Item
+                      onSelect={() =>
+                        togglePlan.mutate(plan === 'essencial' ? 'completo' : 'essencial')
+                      }
+                      className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-ink outline-none data-[highlighted]:bg-surface-page"
+                    >
+                      <Sparkles size={16} className="text-ink-muted" />
+                      {plan === 'essencial' ? 'Ativar modo completo' : 'Usar modo essencial'}
+                    </DropdownMenu.Item>
+                  ) : null}
                   <DropdownMenu.Item
                     onSelect={() => void logout()}
                     className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-ink outline-none data-[highlighted]:bg-surface-page"

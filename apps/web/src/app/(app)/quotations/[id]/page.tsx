@@ -123,13 +123,13 @@ export default function QuotationDetailPage(): JSX.Element {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="p-4 lg:col-span-2">
-          <h2 className="mb-3 text-sm font-semibold text-slate-800">Itens</h2>
+          <h2 className="mb-3 text-sm font-semibold text-ink">Itens</h2>
           {!data.lines || data.lines.length === 0 ? (
             <EmptyState message="Sem itens." />
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-200">
+                <tr className="border-b border-surface-line">
                   <Th>Tipo</Th>
                   <Th>Descrição</Th>
                   <Th className="text-right">Qtd</Th>
@@ -139,7 +139,7 @@ export default function QuotationDetailPage(): JSX.Element {
               </thead>
               <tbody>
                 {data.lines.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100">
+                  <tr key={item.id} className="border-b border-surface-line/70">
                     <Td>{enumLabel(LINE_TYPE, item.type)}</Td>
                     <Td>{item.description ?? '-'}</Td>
                     <Td className="text-right">{String(item.quantity)}</Td>
@@ -156,12 +156,12 @@ export default function QuotationDetailPage(): JSX.Element {
               </tbody>
             </table>
           )}
-          <div className="mt-3 text-right text-sm text-slate-700">
+          <div className="mt-3 text-right text-sm text-ink">
             Total: <strong>{formatMoney(data.total)}</strong>
           </div>
 
           {editable ? (
-            <div className="mt-4 border-t border-slate-100 pt-4">
+            <div className="mt-4 border-t border-surface-line/70 pt-4">
               <ErrorText>{error}</ErrorText>
               <div className="mb-3 max-w-sm">
                 <Field label="Serviço do catálogo (opcional)">
@@ -223,7 +223,7 @@ export default function QuotationDetailPage(): JSX.Element {
         </Card>
 
         <Card className="p-4">
-          <h2 className="text-sm font-semibold text-slate-800">Ações</h2>
+          <h2 className="text-sm font-semibold text-ink">Ações</h2>
           <ErrorText>{error}</ErrorText>
           <div className="mt-3 flex flex-col gap-2">
             {data.status === 'DRAFT' ? (

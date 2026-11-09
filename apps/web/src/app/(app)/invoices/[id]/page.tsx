@@ -117,13 +117,13 @@ export default function InvoiceDetailPage(): JSX.Element {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="p-4 lg:col-span-2">
-          <h2 className="mb-3 text-sm font-semibold text-slate-800">Itens</h2>
+          <h2 className="mb-3 text-sm font-semibold text-ink">Itens</h2>
           {!data.lines || data.lines.length === 0 ? (
             <EmptyState message="Sem itens." />
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-200">
+                <tr className="border-b border-surface-line">
                   <Th>Descrição</Th>
                   <Th className="text-right">Qtd</Th>
                   <Th className="text-right">Total</Th>
@@ -131,7 +131,7 @@ export default function InvoiceDetailPage(): JSX.Element {
               </thead>
               <tbody>
                 {data.lines.map((line) => (
-                  <tr key={line.id} className="border-b border-slate-100">
+                  <tr key={line.id} className="border-b border-surface-line/70">
                     <Td>{line.description ?? enumLabel(LINE_TYPE, line.type)}</Td>
                     <Td className="text-right">{String(line.quantity)}</Td>
                     <Td className="text-right">{formatMoney(line.total)}</Td>
@@ -148,9 +148,9 @@ export default function InvoiceDetailPage(): JSX.Element {
         </Card>
 
         <Card className="p-4">
-          <h2 className="text-sm font-semibold text-slate-800">Pagamentos</h2>
+          <h2 className="text-sm font-semibold text-ink">Pagamentos</h2>
           <ErrorText>{error}</ErrorText>
-          <ul className="mt-2 space-y-1 text-xs text-slate-500">
+          <ul className="mt-2 space-y-1 text-xs text-ink-muted">
             {data.payments?.length ? (
               data.payments.map((item) => (
                 <li key={item.id} className="flex justify-between">

@@ -49,8 +49,8 @@ Variáveis:
   BACKUP_S3_PREFIX          prefixo das chaves (padrão: gestor-oficinas)
   AWS_ACCESS_KEY_ID         credencial de upload
   AWS_SECRET_ACCESS_KEY     credencial de upload
-  BACKUP_RETENTION_DAYS     retenção diária (padrão: 30)
-  BACKUP_MONTHLY_RETENTION_DAYS  retenção mensal (padrão: 365)
+  BACKUP_RETENTION_DAYS     retenção diária (padrão: 3)
+  BACKUP_MONTHLY_RETENTION_DAYS  retenção mensal (padrão: 30)
   PG_DUMP / PG_RESTORE      caminhos opcionais dos binários
 
 Opções:
@@ -369,12 +369,12 @@ async function main() {
   if (prune) {
     const dailyDays = parseInteger(
       process.env.BACKUP_RETENTION_DAYS,
-      30,
+      3,
       "BACKUP_RETENTION_DAYS",
     );
     const monthlyDays = parseInteger(
       process.env.BACKUP_MONTHLY_RETENTION_DAYS,
-      365,
+      30,
       "BACKUP_MONTHLY_RETENTION_DAYS",
     );
     pruned = await pruneBackups({

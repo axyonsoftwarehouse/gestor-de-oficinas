@@ -50,8 +50,8 @@ jobs:
           BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
           BACKUP_S3_REGION: ${{ secrets.BACKUP_S3_REGION }}
           BACKUP_S3_PREFIX: ${{ vars.BACKUP_S3_PREFIX || 'gestor-oficinas' }}
-          BACKUP_RETENTION_DAYS: ${{ vars.BACKUP_RETENTION_DAYS || '30' }}
-          BACKUP_MONTHLY_RETENTION_DAYS: ${{ vars.BACKUP_MONTHLY_RETENTION_DAYS || '365' }}
+          BACKUP_RETENTION_DAYS: ${{ vars.BACKUP_RETENTION_DAYS || '3' }}
+          BACKUP_MONTHLY_RETENTION_DAYS: ${{ vars.BACKUP_MONTHLY_RETENTION_DAYS || '30' }}
           AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
           GITHUB_SHA: ${{ github.sha }}

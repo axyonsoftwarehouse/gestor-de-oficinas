@@ -4,10 +4,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { apiFetch } from '@/lib/api';
+import { maskPlate, plateError, validateChanged } from '@/lib/br';
 import { hasPermission } from '@/lib/permissions';
 import type { Vehicle } from '@/lib/types';
 import { useCustomers } from '@/lib/queries';
 import { useDebounced } from '@/lib/use-debounced';
+import { useFormErrors } from '@/lib/use-form-errors';
 import { useAuth } from '@/components/auth-provider';
 import { useConfirm } from '@/components/confirm';
 import { DataTable, usePagedQuery, type Column } from '@/components/data-table';
@@ -74,6 +76,7 @@ export default function VehiclesPage(): JSX.Element {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const [form, setForm] = useState<VehicleForm>(EMPTY);
+  const [initial, setInitial] = useState<VehicleForm>(EMPTY);
   const [error, setError] = useState('');
 
   const customers = useCustomers();
@@ -116,19 +119,24 @@ export default function VehiclesPage(): JSX.Element {
   function openCreate(): void {
     setEditing(null);
     setForm({ ...EMPTY, customerId: customers.data?.items[0]?.id ?? '' });
+    setInitial(EMPTY);
+    feedback.reset();
     setError('');
     setOpen(true);
   }
 
   function openEdit(vehicle: Vehicle): void {
     setEditing(vehicle);
-    setForm({
+    const values: VehicleForm = {
       customerId: vehicle.customerId,
       plate: vehicle.plate ?? '',
       vin: vehicle.vin ?? '',
       year: vehicle.year ? String(vehicle.year) : '',
       odometer: vehicle.odometer ? String(vehicle.odometer) : '',
-    });
+    };
+    setForm(values);
+    setInitial(values);
+    feedback.reset();
     setError('');
     setOpen(true);
   }
@@ -150,6 +158,8 @@ export default function VehiclesPage(): JSX.Element {
   const canCreate = hasPermission(granted, 'vehicle.create');
   const canEdit = hasPermission(granted, 'vehicle.edit');
   const canDelete = hasPermission(granted, 'vehicle.delete');
+  const { errors } = validateChanged(form, initial, { plate: plateError });
+  const feedback = useFormErrors(errors);
   const canSave = Boolean(form.customerId && form.plate) && !save.isPending;
 
   return (
@@ -216,9 +226,10 @@ export default function VehiclesPage(): JSX.Element {
         <form
           id="vehicle-form"
           className="space-y-4"
+          onBlur={feedback.onBlur}
           onSubmit={(event) => {
             event.preventDefault();
-            if (canSave) save.mutate();
+            if (canSave && feedback.attempt()) save.mutate();
           }}
         >
           <ErrorText>{error}</ErrorText>
@@ -237,11 +248,14 @@ export default function VehiclesPage(): JSX.Element {
                 ))}
               </Select>
             </Field>
-            <Field label="Placa">
+            <Field label="Placa" error={feedback.errorFor('plate')}>
               <Input
                 required
+                name="plate"
+                placeholder="ABC1D23"
+                className="font-mono uppercase"
                 value={form.plate}
-                onChange={(e) => set('plate', e.target.value.toUpperCase())}
+                onChange={(e) => set('plate', maskPlate(e.target.value))}
               />
             </Field>
             <Field label="VIN">

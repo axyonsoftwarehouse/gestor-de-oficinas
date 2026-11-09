@@ -2,8 +2,8 @@ import type { Config } from 'tailwindcss';
 
 /**
  * Tema inspirado no FinTrust UI Kit, com suporte a Light/Dark via CSS variables.
- * Os valores ficam em globals.css (`:root` e `.dark`). A escala `slate` também é
- * remapeada para os tons do kit, então as telas existentes herdam o tema inteiro.
+ * Os valores ficam em globals.css (`:root` e `.dark`). Use sempre os tokens
+ * (`ink`, `surface`, `brand`, `state`), nunca cores cruas do Tailwind.
  */
 const rgb = (variable: string): string => `rgb(var(${variable}) / <alpha-value>)`;
 
@@ -42,22 +42,9 @@ const config: Config = {
           danger: rgb('--state-danger'),
           info: rgb('--state-info'),
         },
-        slate: {
-          50: rgb('--slate-50'),
-          100: rgb('--slate-100'),
-          200: rgb('--slate-200'),
-          300: rgb('--slate-300'),
-          400: rgb('--slate-400'),
-          500: rgb('--slate-500'),
-          600: rgb('--slate-600'),
-          700: rgb('--slate-700'),
-          800: rgb('--slate-800'),
-          900: rgb('--slate-900'),
-          950: rgb('--slate-950'),
-        },
       },
       fontFamily: {
-        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        sans: ['var(--font-inter)', 'Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
       },
       borderRadius: {
         lg: '0.625rem',
